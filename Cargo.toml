@@ -1,0 +1,14 @@
+[package]
+description = "A client IP address extractor for Axum"
+edition = "2021"
+license = "MIT"
+name = "axum-client-ip"
+repository = "https://github.com/imbolc/axum-client-ip"
+version = "0.1.0"
+
+[dependencies]
+axum = "0.4"
+forwarded-header-value = "0.1"
+
+[dev-dependencies]
+rusty-hook = "0.11"
