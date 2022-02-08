@@ -1,4 +1,38 @@
 //! A client IP address extractor for Axum
+//!
+//! It sequentially tries to find a non-local ip in:
+//!
+//! - `x-forwarded-for` header (de-facto standard)
+//! - `x-real-ip` header
+//! - `forwarded` header (new standard)
+//! - [`axum::extract::ConnectInfo`][connect-info] (if not behind proxy)
+//!
+//! ## Usage
+//!
+//! ```rust,no_run
+//! use axum::{extract::ConnectInfo, routing::get, Router};
+//! use axum_client_ip::ClientIp;
+//! use std::net::SocketAddr;
+//!
+//! pub async fn handler(ClientIp(ip): ClientIp) -> String {
+//!     ip.to_string()
+//! }
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let app = Router::new().route("/", get(handler));
+//!
+//!     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+//!         .serve(
+//!             // Don't forget to add `ConnetInfo` if you aren't behind a proxy
+//!             app.into_make_service_with_connect_info::<SocketAddr, _>()
+//!         )
+//!         .await
+//!         .unwrap()
+//! }
+//! ```
+//!
+//! [connect-info]: https://docs.rs/axum/latest/axum/extract/struct.ConnectInfo.html
 
 #![warn(clippy::all, missing_docs, nonstandard_style, future_incompatible)]
 
@@ -34,7 +68,7 @@ where
         maybe_x_forwarded_for(headers)
             .or_else(|| maybe_x_real_ip(headers))
             .or_else(|| maybe_forwarded(headers))
-            .or_else(|| maybe_connection_info(req))
+            .or_else(|| maybe_connect_info(req))
             .map(Self)
             .ok_or((
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -83,8 +117,8 @@ fn maybe_forwarded(headers: &HeaderMap) -> Option<IpAddr> {
     })
 }
 
-/// Tries to find a non-local IP in the `ConnectionInfo` extension
-fn maybe_connection_info<B: Send>(req: &RequestParts<B>) -> Option<IpAddr> {
+/// Tries to find a non-local IP in the `ConnectInfo` extension
+fn maybe_connect_info<B: Send>(req: &RequestParts<B>) -> Option<IpAddr> {
     req.extensions()
         .and_then(|e| e.get::<ConnectInfo<SocketAddr>>())
         .map(|ConnectInfo(addr)| addr.ip())
