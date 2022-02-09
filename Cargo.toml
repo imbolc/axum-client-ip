@@ -11,5 +11,7 @@ axum = "0.4"
 forwarded-header-value = "0.1"
 
 [dev-dependencies]
+hyper = "0.14"
 rusty-hook = "0.11"
 tokio = { version = "1", features = ["full"] }
+tower = "0.4"

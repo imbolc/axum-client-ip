@@ -49,7 +49,7 @@ use std::net::IpAddr;
 const X_REAL_IP: &str = "x-real-ip";
 const X_FORWARDED_FOR: &str = "x-forwarded-for";
 
-/// Extractor for the real client IP address
+/// Extractor for the client IP address
 pub struct ClientIp(pub IpAddr);
 
 #[async_trait]
@@ -120,8 +120,71 @@ fn maybe_connect_info<B: Send>(req: &RequestParts<B>) -> Option<IpAddr> {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    use crate::ClientIp;
+    use axum::{
+        body::{Body, BoxBody},
+        http::Request,
+        routing::get,
+        Router,
+    };
+    use tower::ServiceExt;
+
+    fn app() -> Router {
+        Router::new().route(
+            "/",
+            get(|ClientIp(ip): ClientIp| async move { ip.to_string() }),
+        )
+    }
+
+    async fn body_string(body: BoxBody) -> String {
+        let bytes = hyper::body::to_bytes(body).await.unwrap();
+        String::from_utf8_lossy(&bytes).into()
+    }
+
+    #[tokio::test]
+    async fn x_forwarded_for() {
+        let req = Request::builder()
+            .uri("/")
+            .header("X-Forwarded-For", "1.1.1.1, 2.2.2.2")
+            .body(Body::empty())
+            .unwrap();
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(res.into_body()).await, "1.1.1.1");
+    }
+
+    #[tokio::test]
+    async fn x_real_ip() {
+        let req = Request::builder()
+            .uri("/")
+            .header("X-Real-Ip", "1.2.3.4")
+            .body(Body::empty())
+            .unwrap();
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(res.into_body()).await, "1.2.3.4");
+    }
+
+    #[tokio::test]
+    async fn forwarded() {
+        let req = Request::builder()
+            .uri("/")
+            .header("Forwarded", "For=\"[2001:db8:cafe::17]:4711\"")
+            .body(Body::empty())
+            .unwrap();
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(res.into_body()).await, "2001:db8:cafe::17");
+    }
+
+    #[tokio::test]
+    async fn malformed() {
+        let req = Request::builder()
+            .uri("/")
+            .header("X-Forwarded-For", "foo")
+            .header("X-Real-Ip", "foo")
+            .header("Forwarded", "foo")
+            .header("Forwarded", "for=1.1.1.1;proto=https;by=2.2.2.2")
+            .body(Body::empty())
+            .unwrap();
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(res.into_body()).await, "1.1.1.1");
     }
 }
