@@ -6,7 +6,7 @@
 
 A client IP address extractor for Axum
 
-It sequentially tries to find a non-local ip in:
+It sequentially looks for an IP in:
 
 - `x-forwarded-for` header (de-facto standard)
 - `x-real-ip` header
