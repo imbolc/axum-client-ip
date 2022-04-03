@@ -31,7 +31,7 @@ async fn main() {
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
         .serve(
             // Don't forget to add `ConnetInfo` if you aren't behind a proxy
-            app.into_make_service_with_connect_info::<SocketAddr, _>()
+            app.into_make_service_with_connect_info::<SocketAddr>()
         )
         .await
         .unwrap()
