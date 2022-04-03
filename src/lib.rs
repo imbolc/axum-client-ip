@@ -25,7 +25,7 @@
 //!     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
 //!         .serve(
 //!             // Don't forget to add `ConnetInfo` if you aren't behind a proxy
-//!             app.into_make_service_with_connect_info::<SocketAddr, _>()
+//!             app.into_make_service_with_connect_info::<SocketAddr>()
 //!         )
 //!         .await
 //!         .unwrap()
@@ -60,10 +60,7 @@ where
     type Rejection = (StatusCode, &'static str);
 
     async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
-        let headers = req.headers().ok_or((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Can't extract client IP: headers has been taken by another extractor",
-        ))?;
+        let headers = req.headers();
 
         maybe_x_forwarded_for(headers)
             .or_else(|| maybe_x_real_ip(headers))
@@ -114,7 +111,7 @@ fn maybe_forwarded(headers: &HeaderMap) -> Option<IpAddr> {
 /// Looks in `ConnectInfo` extension
 fn maybe_connect_info<B: Send>(req: &RequestParts<B>) -> Option<IpAddr> {
     req.extensions()
-        .and_then(|e| e.get::<ConnectInfo<SocketAddr>>())
+        .get::<ConnectInfo<SocketAddr>>()
         .map(|ConnectInfo(addr)| addr.ip())
 }
 
