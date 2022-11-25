@@ -10,7 +10,7 @@
 //! ## Usage
 //!
 //! ```rust,no_run
-//! use axum::{extract::ConnectInfo, routing::get, Router};
+//! use axum::{routing::get, Router};
 //! use axum_client_ip::ClientIp;
 //! use std::net::SocketAddr;
 //!
