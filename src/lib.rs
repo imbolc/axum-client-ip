@@ -38,11 +38,11 @@
 
 use axum::{
     async_trait,
-    extract::{ConnectInfo, FromRequest, RequestParts},
-    http::{header::FORWARDED, HeaderMap, StatusCode},
+    extract::{ConnectInfo, FromRequestParts},
+    http::{header::FORWARDED, request::Parts, Extensions, HeaderMap, StatusCode},
 };
 use forwarded_header_value::{ForwardedHeaderValue, Identifier};
-use std::net::SocketAddr;
+use std::{marker::Sync, net::SocketAddr};
 
 use std::net::IpAddr;
 
@@ -53,19 +53,17 @@ const X_FORWARDED_FOR: &str = "x-forwarded-for";
 pub struct ClientIp(pub IpAddr);
 
 #[async_trait]
-impl<B> FromRequest<B> for ClientIp
+impl<S> FromRequestParts<S> for ClientIp
 where
-    B: Send,
+    S: Sync,
 {
     type Rejection = (StatusCode, &'static str);
 
-    async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
-        let headers = req.headers();
-
-        maybe_x_forwarded_for(headers)
-            .or_else(|| maybe_x_real_ip(headers))
-            .or_else(|| maybe_forwarded(headers))
-            .or_else(|| maybe_connect_info(req))
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        maybe_x_forwarded_for(&parts.headers)
+            .or_else(|| maybe_x_real_ip(&parts.headers))
+            .or_else(|| maybe_forwarded(&parts.headers))
+            .or_else(|| maybe_connect_info(&parts.extensions))
             .map(Self)
             .ok_or((
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -109,8 +107,8 @@ fn maybe_forwarded(headers: &HeaderMap) -> Option<IpAddr> {
 }
 
 /// Looks in `ConnectInfo` extension
-fn maybe_connect_info<B: Send>(req: &RequestParts<B>) -> Option<IpAddr> {
-    req.extensions()
+fn maybe_connect_info(extensions: &Extensions) -> Option<IpAddr> {
+    extensions
         .get::<ConnectInfo<SocketAddr>>()
         .map(|ConnectInfo(addr)| addr.ip())
 }

@@ -7,7 +7,7 @@ repository = "https://github.com/imbolc/axum-client-ip"
 version = "0.2.0"
 
 [dependencies]
-axum = "0.5"
+axum = "0.6"
 forwarded-header-value = "0.1"
 
 [dev-dependencies]
