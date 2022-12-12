@@ -15,6 +15,10 @@ It sequentially looks for an IP in:
 - `forwarded` header (new standard)
 - [`axum::extract::ConnectInfo`][connect-info] (if not behind proxy)
 
+The most often issue with this extractor is using it after one consuming body e.g. `Json`.
+To fix this rearrange extractors in your handler definition moving body consumption to the
+end, [details][extractors-order].
+
 ## Usage
 
 ```rust,no_run
@@ -41,6 +45,7 @@ async fn main() {
 ```
 
 [connect-info]: https://docs.rs/axum/latest/axum/extract/struct.ConnectInfo.html
+[extractors-order]: https://docs.rs/axum/latest/axum/extract/index.html#the-order-of-extractors
 
 <!-- cargo-sync-readme end -->
 
