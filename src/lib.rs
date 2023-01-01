@@ -77,7 +77,7 @@ where
     }
 }
 
-/// Tries to parse the `x-real-ip` header
+/// Tries to parse the `x-forwarded-for` header
 fn maybe_x_forwarded_for(headers: &HeaderMap) -> Option<IpAddr> {
     headers
         .get(X_FORWARDED_FOR)
