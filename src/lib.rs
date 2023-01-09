@@ -82,7 +82,11 @@ fn maybe_x_forwarded_for(headers: &HeaderMap) -> Option<IpAddr> {
     headers
         .get(X_FORWARDED_FOR)
         .and_then(|hv| hv.to_str().ok())
-        .and_then(|s| s.split(',').find_map(|s| s.trim().parse::<IpAddr>().ok()))
+        .and_then(|s| {
+            s.split(',')
+                .rev()
+                .find_map(|s| s.trim().parse::<IpAddr>().ok())
+        })
 }
 
 /// Tries to parse the `x-real-ip` header
@@ -149,7 +153,7 @@ mod tests {
             .body(Body::empty())
             .unwrap();
         let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "1.1.1.1");
+        assert_eq!(body_string(res.into_body()).await, "2.2.2.2");
     }
 
     #[tokio::test]
