@@ -96,15 +96,12 @@ where
 }
 
 /// Tries to parse the `x-forwarded-for` header
+/// It treats the leftmost IP of the first header as belonging to the client
 fn maybe_x_forwarded_for(headers: &HeaderMap) -> Option<IpAddr> {
     headers
         .get(X_FORWARDED_FOR)
         .and_then(|hv| hv.to_str().ok())
-        .and_then(|s| {
-            s.split(',')
-                .rev()
-                .find_map(|s| s.trim().parse::<IpAddr>().ok())
-        })
+        .and_then(|s| s.split(',').find_map(|s| s.trim().parse::<IpAddr>().ok()))
 }
 
 /// Tries to parse the `x-real-ip` header
@@ -168,10 +165,11 @@ mod tests {
         let req = Request::builder()
             .uri("/")
             .header("X-Forwarded-For", "1.1.1.1, 2.2.2.2")
+            .header("X-Forwarded-For", "3.3.3.3, 4.4.4.4")
             .body(Body::empty())
             .unwrap();
         let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "2.2.2.2");
+        assert_eq!(body_string(res.into_body()).await, "1.1.1.1");
     }
 
     #[tokio::test]
