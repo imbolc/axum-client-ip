@@ -47,15 +47,35 @@ use axum::{
     http::{header::FORWARDED, request::Parts, Extensions, HeaderMap, StatusCode},
 };
 use forwarded_header_value::{ForwardedHeaderValue, Identifier};
-use std::{marker::Sync, net::SocketAddr};
-
-use std::net::IpAddr;
+use std::{
+    marker::Sync,
+    net::{IpAddr, SocketAddr},
+    sync::Mutex,
+};
 
 const X_REAL_IP: &str = "x-real-ip";
 const X_FORWARDED_FOR: &str = "x-forwarded-for";
 
 /// Extractor for the client IP address
 pub struct ClientIp(pub IpAddr);
+
+type IpFromHeaders = fn(&HeaderMap) -> Option<IpAddr>;
+static ORDER: Mutex<Option<Vec<IpFromHeaders>>> = Mutex::new(None);
+const DEFAULT_ORDER: &[IpFromHeaders] = &[maybe_x_forwarded_for, maybe_x_real_ip, maybe_forwarded];
+
+/// Sets IP extraction order
+pub fn set_order(new_order: &[IpFromHeaders]) {
+    let mut order = ORDER.lock().unwrap();
+    *order = Some(new_order.into());
+}
+
+fn find_ip(headers: &HeaderMap) -> Option<IpAddr> {
+    let mut order = ORDER.lock().unwrap();
+    if order.is_none() {
+        *order = Some(DEFAULT_ORDER.into());
+    }
+    order.as_ref().unwrap().iter().find_map(|f| f(headers))
+}
 
 #[async_trait]
 impl<S> FromRequestParts<S> for ClientIp
@@ -65,9 +85,7 @@ where
     type Rejection = (StatusCode, &'static str);
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        maybe_x_forwarded_for(&parts.headers)
-            .or_else(|| maybe_x_real_ip(&parts.headers))
-            .or_else(|| maybe_forwarded(&parts.headers))
+        find_ip(&parts.headers)
             .or_else(|| maybe_connect_info(&parts.extensions))
             .map(Self)
             .ok_or((
@@ -190,5 +208,29 @@ mod tests {
             .unwrap();
         let res = app().oneshot(req).await.unwrap();
         assert_eq!(body_string(res.into_body()).await, "1.1.1.1");
+    }
+
+    #[tokio::test]
+    async fn change_extractors_order() {
+        let req = Request::builder()
+            .uri("/")
+            .header("X-Real-Ip", "1.1.1.1")
+            .header("Forwarded", "For=\"2.2.2.2\"")
+            .body(Body::empty())
+            .unwrap();
+
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(res.into_body()).await, "1.1.1.1");
+
+        let req = Request::builder()
+            .uri("/")
+            .header("X-Real-Ip", "1.1.1.1")
+            .header("Forwarded", "For=\"2.2.2.2\"")
+            .body(Body::empty())
+            .unwrap();
+
+        crate::set_order(&[crate::maybe_forwarded]);
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(res.into_body()).await, "2.2.2.2");
     }
 }
