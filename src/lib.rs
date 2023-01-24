@@ -230,7 +230,10 @@ mod tests {
             .unwrap();
 
         crate::set_order(&[crate::maybe_forwarded]);
+
         let res = app().oneshot(req).await.unwrap();
         assert_eq!(body_string(res.into_body()).await, "2.2.2.2");
+
+        crate::set_order(crate::DEFAULT_ORDER);
     }
 }
