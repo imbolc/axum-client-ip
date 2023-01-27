@@ -51,8 +51,12 @@ use std::{marker::Sync, net::SocketAddr};
 
 use std::net::IpAddr;
 
-const X_REAL_IP: &str = "x-real-ip";
-const X_FORWARDED_FOR: &str = "x-forwarded-for";
+mod rudimental;
+pub use rudimental::{
+    Forwarded, LeftmostForwarded, LeftmostXForwardedFor, RightmostForwarded,
+    RightmostXForwardedFor, XForwardedFor, XRealIp,
+};
+use rudimental::{X_FORWARDED_FOR, X_REAL_IP};
 
 /// Extractor for the client IP address
 pub struct ClientIp(pub IpAddr);
