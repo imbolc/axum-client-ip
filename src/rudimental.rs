@@ -32,7 +32,7 @@ pub struct Forwarded(pub Vec<IpAddr>);
 /// Rejects with 500 error if the header is absent or there's no valid IP
 pub struct LeftmostForwarded(pub IpAddr);
 
-/// Extracts the leftmost IP from `Forwarded` header.
+/// Extracts the rightmost IP from `Forwarded` header.
 /// Rejects with 500 error if the header is absent or there's no valid IP
 pub struct RightmostForwarded(pub IpAddr);
 
@@ -77,6 +77,16 @@ trait MultiIpHeader {
             .iter()
             .filter_map(|hv| hv.to_str().ok())
             .flat_map(Self::ips_from_header_value)
+            .next()
+    }
+
+    fn rightmost_ip(headers: &HeaderMap) -> Option<IpAddr> {
+        headers
+            .get_all(Self::HEADER)
+            .iter()
+            .filter_map(|hv| hv.to_str().ok())
+            .flat_map(Self::ips_from_header_value)
+            .rev()
             .next()
     }
 
@@ -170,9 +180,7 @@ where
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         Ok(Self(
-            *XForwardedFor::ips_from_headers(&parts.headers)
-                .last()
-                .ok_or_else(XForwardedFor::rejection)?,
+            XForwardedFor::rightmost_ip(&parts.headers).ok_or_else(XForwardedFor::rejection)?,
         ))
     }
 }
@@ -212,9 +220,7 @@ where
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         Ok(Self(
-            *Forwarded::ips_from_headers(&parts.headers)
-                .last()
-                .ok_or_else(Forwarded::rejection)?,
+            Forwarded::rightmost_ip(&parts.headers).ok_or_else(Forwarded::rejection)?,
         ))
     }
 }
@@ -334,11 +340,11 @@ mod tests {
                 "1.1.1.1, foo, 2001:db8:85a3:8d3:1319:8a2e:370:7348",
             )
             .header("X-Forwarded-For", "bar")
-            .header("X-Forwarded-For", "2.2.2.2")
+            .header("X-Forwarded-For", "2.2.2.2, 3.3.3.3")
             .body(Body::empty())
             .unwrap();
         let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "2.2.2.2");
+        assert_eq!(body_string(res.into_body()).await, "3.3.3.3");
     }
 
     #[tokio::test]
