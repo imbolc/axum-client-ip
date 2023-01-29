@@ -39,7 +39,7 @@ pub struct RightmostForwarded(pub IpAddr);
 type StringRejection = (StatusCode, String);
 type InfallibleRejection = (StatusCode, Infallible);
 
-trait SingleIpHeader {
+pub(crate) trait SingleIpHeader {
     const HEADER: &'static str;
 
     fn ip_from_headers(headers: &HeaderMap) -> Option<IpAddr> {
@@ -57,7 +57,7 @@ trait SingleIpHeader {
     }
 }
 
-trait MultiIpHeader {
+pub(crate) trait MultiIpHeader {
     const HEADER: &'static str;
 
     fn ips_from_header_value(header_value: &str) -> Vec<IpAddr>;
