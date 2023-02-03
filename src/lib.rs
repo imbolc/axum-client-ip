@@ -1,30 +1,51 @@
-//! A client IP address extractor for Axum
+//! Client IP address extractors for Axum
 //!
-//! It sequentially looks for an IP in:
+//! ## Why different extractors?
 //!
-//! - `x-forwarded-for` header (de-facto standard)
-//! - `x-real-ip` header
-//! - `forwarded` header (new standard)
-//! - [`axum::extract::ConnectInfo`][connect-info] (if not behind proxy)
+//! There are two distinct use cases for client IP which should be treated differently:
 //!
-//! The most often issue with this extractor is using it after one consuming body e.g. `Json`.
-//! To fix this rearrange extractors in your handler definition moving body consumption to the
-//! end, [details][extractors-order].
+//! 1. You can't tolerate the possibility of spoofing (you're working on rate limiting,
+//!    spam protection, etc). In this case, you should use [`SecureClientIp`] or an extractor for a
+//!    particular header.
+//! 2. You can trade potential spoofing for a statistically better IP determination. E.g. you use
+//!    the IP for geolocation when the correctness of the location isn't critical for your app. For
+//!    something like this, you can use [`InsecureClientIp`].
+//!
+//! For a deep dive into the trade-off refer to this Adam Pritchard's
+//! [article](https://adam-p.ca/blog/2022/03/x-forwarded-for/)
+//!
+//! ## `SecureClientIp` vs specific header extractors
+//!
+//! Except for [`SecureClientIp`] there are [`Forwarded`], [`RightmostForwarded`], [`XForwardedFor`],
+//! [`RightmostXForwardedFor`], and [`XRealIp`] extractors.
+//!
+//! They work the same way - by extracting IP from the specified header you control. The only difference
+//! is in the target header specification. With `SecureClientIp` you can specify the header at
+//! runtime, so you can use e.g. env variable for this setting (look at the implementation
+//! [example][secure-example]). While with specific extractors you'd need to recompile your code if
+//! you'd like to change the target header (e.g. you're moving to another cloud provider). To
+//! mitigate this change you can create a type alias e.g. `type InsecureIp = XRealIp` and use it in
+//! your handlers, then the change will affect only one line.
 //!
 //! ## Usage
 //!
 //! ```rust,no_run
 //! use axum::{routing::get, Router};
-//! use axum_client_ip::ClientIp;
+//! use axum_client_ip::{InsecureClientIp, SecureClientIp, SecureClientIpSource};
 //! use std::net::SocketAddr;
 //!
-//! pub async fn handler(ClientIp(ip): ClientIp) -> String {
-//!     ip.to_string()
+//! async fn handler(insecure_ip: InsecureClientIp, secure_ip: SecureClientIp) -> String {
+//!     format!("{insecure_ip:?} {secure_ip:?}")
 //! }
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let app = Router::new().route("/", get(handler));
+//!     async fn handler(insecure_ip: InsecureClientIp, secure_ip: SecureClientIp) -> String {
+//!         format!("{insecure_ip:?} {secure_ip:?}")
+//!     }
+//!
+//!     let app = Router::new().route("/", get(handler))
+//!         .layer(SecureClientIpSource::ConnectInfo.into_extension());
 //!
 //!     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
 //!         .serve(
@@ -36,124 +57,27 @@
 //! }
 //! ```
 //!
-//! [connect-info]: https://docs.rs/axum/latest/axum/extract/struct.ConnectInfo.html
+//!
+//! ## A common issue with Axum extractors
+//!
+//! The most often issue with this extractor is using it after one consuming body e.g.
+//! [`axum::extract::Json`].
+//! To fix this rearrange extractors in your handler definition moving body consumption to the
+//! end, see [details][extractors-order].
+//!
+//!
+//! [secure-example]: https://github.com/imbolc/axum-client-ip/examples/secure.rs
 //! [extractors-order]: https://docs.rs/axum/latest/axum/extract/index.html#the-order-of-extractors
 
 #![warn(clippy::all, missing_docs, nonstandard_style, future_incompatible)]
 
-use axum::{
-    async_trait,
-    extract::{ConnectInfo, FromRequestParts},
-    http::{request::Parts, Extensions, StatusCode},
-};
-use std::{marker::Sync, net::SocketAddr};
-
-use std::net::IpAddr;
-
+mod insecure;
 mod rudimental;
+mod secure;
+pub use insecure::InsecureClientIp;
 pub use rudimental::{
     Forwarded, LeftmostForwarded, LeftmostXForwardedFor, RightmostForwarded,
     RightmostXForwardedFor, XForwardedFor, XRealIp,
 };
-use rudimental::{MultiIpHeader, SingleIpHeader};
-
-/// Extractor for the client IP address
-pub struct ClientIp(pub IpAddr);
-
-#[async_trait]
-impl<S> FromRequestParts<S> for ClientIp
-where
-    S: Sync,
-{
-    type Rejection = (StatusCode, &'static str);
-
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        XForwardedFor::leftmost_ip(&parts.headers)
-            .or_else(|| XRealIp::ip_from_headers(&parts.headers))
-            .or_else(|| Forwarded::leftmost_ip(&parts.headers))
-            .or_else(|| maybe_connect_info(&parts.extensions))
-            .map(Self)
-            .ok_or((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Can't determine the client IP, check forwarding configuration",
-            ))
-    }
-}
-
-/// Looks in `ConnectInfo` extension
-fn maybe_connect_info(extensions: &Extensions) -> Option<IpAddr> {
-    extensions
-        .get::<ConnectInfo<SocketAddr>>()
-        .map(|ConnectInfo(addr)| addr.ip())
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::ClientIp;
-    use axum::{
-        body::{Body, BoxBody},
-        http::Request,
-        routing::get,
-        Router,
-    };
-    use tower::ServiceExt;
-
-    fn app() -> Router {
-        Router::new().route(
-            "/",
-            get(|ClientIp(ip): ClientIp| async move { ip.to_string() }),
-        )
-    }
-
-    async fn body_string(body: BoxBody) -> String {
-        let bytes = hyper::body::to_bytes(body).await.unwrap();
-        String::from_utf8_lossy(&bytes).into()
-    }
-
-    #[tokio::test]
-    async fn x_forwarded_for() {
-        let req = Request::builder()
-            .uri("/")
-            .header("X-Forwarded-For", "1.1.1.1, 2.2.2.2")
-            .body(Body::empty())
-            .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "1.1.1.1");
-    }
-
-    #[tokio::test]
-    async fn x_real_ip() {
-        let req = Request::builder()
-            .uri("/")
-            .header("X-Real-Ip", "1.2.3.4")
-            .body(Body::empty())
-            .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "1.2.3.4");
-    }
-
-    #[tokio::test]
-    async fn forwarded() {
-        let req = Request::builder()
-            .uri("/")
-            .header("Forwarded", "For=\"[2001:db8:cafe::17]:4711\"")
-            .body(Body::empty())
-            .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "2001:db8:cafe::17");
-    }
-
-    #[tokio::test]
-    async fn malformed() {
-        let req = Request::builder()
-            .uri("/")
-            .header("X-Forwarded-For", "foo")
-            .header("X-Real-Ip", "foo")
-            .header("Forwarded", "foo")
-            .header("Forwarded", "for=1.1.1.1;proto=https;by=2.2.2.2")
-            .body(Body::empty())
-            .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "1.1.1.1");
-    }
-}
+pub use secure::{SecureClientIp, SecureClientIpSource};
+mod rejection;

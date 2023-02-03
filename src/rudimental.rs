@@ -1,59 +1,63 @@
+use crate::rejection::InfallibleRejection;
+pub use crate::rejection::StringRejection;
 use axum::{
     async_trait,
     extract::FromRequestParts,
-    http::{request::Parts, HeaderMap, StatusCode},
+    http::{request::Parts, HeaderMap},
 };
-use std::convert::Infallible;
 use std::net::IpAddr;
 
 pub(crate) const X_REAL_IP: &str = "X-Real-Ip";
 pub(crate) const X_FORWARDED_FOR: &str = "X-Forwarded-For";
 pub(crate) const FORWARDED: &str = "Forwarded";
 
-/// Extracts a valid IP from `X-Real-Ip` header.
-/// Rejects with 500 error if the header is absent or the IP isn't valid
+/// Extracts a valid IP from `X-Real-Ip` header
+///
+/// Rejects with a 500 error if the header is absent or the IP isn't valid
 pub struct XRealIp(pub IpAddr);
 
-/// Extracts list of valid IPs from `X-Forwarded-For` header
+/// Extracts a list of valid IPs from `X-Forwarded-For` header
 pub struct XForwardedFor(pub Vec<IpAddr>);
 
-/// Extracts the leftmost IP from `X-Forwarded-For` header.
-/// Rejects with 500 error if the header is absent or there's no valid IP
+/// Extracts the leftmost IP from `X-Forwarded-For` header
+///
+/// Rejects with a 500 error if the header is absent or there's no valid IP
 pub struct LeftmostXForwardedFor(pub IpAddr);
 
-/// Extracts the leftmost IP from `X-Forwarded-For` header.
-/// Rejects with 500 error if the header is absent or there's no valid IP
+/// Extracts the leftmost IP from `X-Forwarded-For` header
+///
+/// Rejects with a 500 error if the header is absent or there's no valid IP
 pub struct RightmostXForwardedFor(pub IpAddr);
 
-/// Extracts list of valid IPs from `Forwarded` header
+/// Extracts a list of valid IPs from `Forwarded` header
 pub struct Forwarded(pub Vec<IpAddr>);
 
-/// Extracts the leftmost IP from `Forwarded` header.
-/// Rejects with 500 error if the header is absent or there's no valid IP
+/// Extracts the leftmost IP from `Forwarded` header
+///
+/// Rejects with a 500 error if the header is absent or there's no valid IP
 pub struct LeftmostForwarded(pub IpAddr);
 
-/// Extracts the rightmost IP from `Forwarded` header.
-/// Rejects with 500 error if the header is absent or there's no valid IP
+/// Extracts the rightmost IP from `Forwarded` header
+///
+/// Rejects with a 500 error if the header is absent or there's no valid IP
 pub struct RightmostForwarded(pub IpAddr);
-
-type StringRejection = (StatusCode, String);
-type InfallibleRejection = (StatusCode, Infallible);
 
 pub(crate) trait SingleIpHeader {
     const HEADER: &'static str;
 
-    fn ip_from_headers(headers: &HeaderMap) -> Option<IpAddr> {
+    fn maybe_ip_from_headers(headers: &HeaderMap) -> Option<IpAddr> {
         headers
             .get(Self::HEADER)
             .and_then(|hv| hv.to_str().ok())
             .and_then(|s| s.parse::<IpAddr>().ok())
     }
 
+    fn ip_from_headers(headers: &HeaderMap) -> Result<IpAddr, StringRejection> {
+        Self::maybe_ip_from_headers(headers).ok_or_else(|| Self::rejection())
+    }
+
     fn rejection() -> StringRejection {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("No `{}` header, or the IP is invalid", Self::HEADER),
-        )
+        format!("No `{}` header, or the IP is invalid", Self::HEADER).into()
     }
 }
 
@@ -71,7 +75,7 @@ pub(crate) trait MultiIpHeader {
             .collect()
     }
 
-    fn leftmost_ip(headers: &HeaderMap) -> Option<IpAddr> {
+    fn maybe_leftmost_ip(headers: &HeaderMap) -> Option<IpAddr> {
         headers
             .get_all(Self::HEADER)
             .iter()
@@ -80,7 +84,11 @@ pub(crate) trait MultiIpHeader {
             .next()
     }
 
-    fn rightmost_ip(headers: &HeaderMap) -> Option<IpAddr> {
+    fn leftmost_ip(headers: &HeaderMap) -> Result<IpAddr, StringRejection> {
+        Self::maybe_leftmost_ip(headers).ok_or_else(|| Self::rejection())
+    }
+
+    fn maybe_rightmost_ip(headers: &HeaderMap) -> Option<IpAddr> {
         headers
             .get_all(Self::HEADER)
             .iter()
@@ -90,11 +98,12 @@ pub(crate) trait MultiIpHeader {
             .next()
     }
 
+    fn rightmost_ip(headers: &HeaderMap) -> Result<IpAddr, StringRejection> {
+        Self::maybe_rightmost_ip(headers).ok_or_else(|| Self::rejection())
+    }
+
     fn rejection() -> StringRejection {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Couldn't find a valid IP in the `{}` header", Self::HEADER),
-        )
+        format!("Couldn't find a valid IP in the `{}` header", Self::HEADER).into()
     }
 }
 
@@ -107,11 +116,11 @@ impl<S> FromRequestParts<S> for XRealIp
 where
     S: Sync,
 {
-    type Rejection = (StatusCode, String);
+    type Rejection = StringRejection;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         Ok(Self(
-            Self::ip_from_headers(&parts.headers).ok_or_else(Self::rejection)?,
+            Self::maybe_ip_from_headers(&parts.headers).ok_or_else(Self::rejection)?,
         ))
     }
 }
@@ -166,7 +175,8 @@ where
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         Ok(Self(
-            XForwardedFor::leftmost_ip(&parts.headers).ok_or_else(XForwardedFor::rejection)?,
+            XForwardedFor::maybe_leftmost_ip(&parts.headers)
+                .ok_or_else(XForwardedFor::rejection)?,
         ))
     }
 }
@@ -180,7 +190,8 @@ where
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         Ok(Self(
-            XForwardedFor::rightmost_ip(&parts.headers).ok_or_else(XForwardedFor::rejection)?,
+            XForwardedFor::maybe_rightmost_ip(&parts.headers)
+                .ok_or_else(XForwardedFor::rejection)?,
         ))
     }
 }
@@ -206,7 +217,7 @@ where
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         Ok(Self(
-            Forwarded::leftmost_ip(&parts.headers).ok_or_else(Forwarded::rejection)?,
+            Forwarded::maybe_leftmost_ip(&parts.headers).ok_or_else(Forwarded::rejection)?,
         ))
     }
 }
@@ -220,7 +231,7 @@ where
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         Ok(Self(
-            Forwarded::rightmost_ip(&parts.headers).ok_or_else(Forwarded::rejection)?,
+            Forwarded::maybe_rightmost_ip(&parts.headers).ok_or_else(Forwarded::rejection)?,
         ))
     }
 }

@@ -1,8 +1,8 @@
 use axum::{routing::get, Router};
-use axum_client_ip::ClientIp;
+use axum_client_ip::InsecureClientIp;
 use std::net::SocketAddr;
 
-pub async fn handler(ClientIp(ip): ClientIp) -> String {
+async fn handler(InsecureClientIp(ip): InsecureClientIp) -> String {
     ip.to_string()
 }
 
@@ -12,7 +12,7 @@ async fn main() {
 
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
         .serve(
-            // Don't forget to add `ConnetInfo` if you aren't behind a proxy
+            // Don't forget to add `ConnetInfo`
             app.into_make_service_with_connect_info::<SocketAddr>(),
         )
         .await

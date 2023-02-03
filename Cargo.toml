@@ -1,16 +1,18 @@
 [package]
-description = "A client IP address extractor for Axum"
+description = "Client IP address extractors for Axum"
 edition = "2021"
 license = "MIT"
 name = "axum-client-ip"
 repository = "https://github.com/imbolc/axum-client-ip"
-version = "0.3.1"
+version = "0.4.0"
 
 [dependencies]
 axum = "0.6"
 forwarded-header-value = "0.1"
+serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
+envy = "0.4"
 hyper = "0.14"
 rusty-hook = "0.11"
 tokio = { version = "1", features = ["full"] }
