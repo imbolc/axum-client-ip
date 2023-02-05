@@ -8,49 +8,59 @@ use axum::{
 use std::net::IpAddr;
 
 /// Extracts a list of valid IP addresses from `X-Forwarded-For` header
+#[derive(Debug)]
 pub struct XForwardedFor(pub Vec<IpAddr>);
 
 /// Extracts the leftmost IP from `X-Forwarded-For` header
 ///
 /// Rejects with a 500 error if the header is absent or there's no valid IP
+#[derive(Debug)]
 pub struct LeftmostXForwardedFor(pub IpAddr);
 
 /// Extracts the leftmost IP from `X-Forwarded-For` header
 ///
 /// Rejects with a 500 error if the header is absent or there's no valid IP
+#[derive(Debug)]
 pub struct RightmostXForwardedFor(pub IpAddr);
 
 /// Extracts a list of valid IP addresses from `Forwarded` header
+#[derive(Debug)]
 pub struct Forwarded(pub Vec<IpAddr>);
 
 /// Extracts the leftmost IP from `Forwarded` header
 ///
 /// Rejects with a 500 error if the header is absent or there's no valid IP
+#[derive(Debug)]
 pub struct LeftmostForwarded(pub IpAddr);
 
 /// Extracts the rightmost IP from `Forwarded` header
 ///
 /// Rejects with a 500 error if the header is absent or there's no valid IP
+#[derive(Debug)]
 pub struct RightmostForwarded(pub IpAddr);
 
 /// Extracts a valid IP from `X-Real-Ip` (Nginx) header
 ///
 /// Rejects with a 500 error if the header is absent or the IP isn't valid
+#[derive(Debug)]
 pub struct XRealIp(pub IpAddr);
 
 /// Extracts a valid IP from `Fly-Client-IP` (Fly.io) header
 ///
 /// Rejects with a 500 error if the header is absent or the IP isn't valid
+#[derive(Debug)]
 pub struct FlyClientIp(pub IpAddr);
 
 /// Extracts a valid IP from `True-Client-IP` (Akamai, Cloudflare) header
 ///
 /// Rejects with a 500 error if the header is absent or the IP isn't valid
+#[derive(Debug)]
 pub struct TrueClientIp(pub IpAddr);
 
 /// Extracts a valid IP from `CF-Connecting-IP` (Cloudflare) header
 ///
 /// Rejects with a 500 error if the header is absent or the IP isn't valid
+#[derive(Debug)]
 pub struct CfConnectingIp(pub IpAddr);
 
 pub(crate) trait SingleIpHeader {
