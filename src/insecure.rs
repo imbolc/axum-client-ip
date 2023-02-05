@@ -16,7 +16,7 @@ use std::{
 /// the wrong location won't be a security issue for your app. But for something like rate limiting you
 /// certainly should use [`crate::SecureClientIp`] instead.
 ///
-/// Technically it means looking for leftmost IPs provided by forward proxy first, then into single
+/// Technically it means looking for leftmost IP addresses provided by forward proxy first, and then look into single
 /// IP headers like `X-Real-Ip`, and then falling back to the [`axum::extract::ConnectInfo`].
 ///
 /// It returns a 500 error if you forget to provide the `ConnectInfo` with e.g.

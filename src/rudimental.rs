@@ -16,7 +16,7 @@ pub(crate) const FORWARDED: &str = "Forwarded";
 /// Rejects with a 500 error if the header is absent or the IP isn't valid
 pub struct XRealIp(pub IpAddr);
 
-/// Extracts a list of valid IPs from `X-Forwarded-For` header
+/// Extracts a list of valid IP addresses from `X-Forwarded-For` header
 pub struct XForwardedFor(pub Vec<IpAddr>);
 
 /// Extracts the leftmost IP from `X-Forwarded-For` header
@@ -29,7 +29,7 @@ pub struct LeftmostXForwardedFor(pub IpAddr);
 /// Rejects with a 500 error if the header is absent or there's no valid IP
 pub struct RightmostXForwardedFor(pub IpAddr);
 
-/// Extracts a list of valid IPs from `Forwarded` header
+/// Extracts a list of valid IP addresses from `Forwarded` header
 pub struct Forwarded(pub Vec<IpAddr>);
 
 /// Extracts the leftmost IP from `Forwarded` header

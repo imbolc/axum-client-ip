@@ -24,12 +24,12 @@ For a deep dive into the trade-off refer to this Adam Pritchard's
 
 ## `SecureClientIp` vs specific header extractors
 
-Except for [`SecureClientIp`] there are [`Forwarded`], [`RightmostForwarded`], [`XForwardedFor`],
+Apart from [`SecureClientIp`] there are [`Forwarded`], [`RightmostForwarded`], [`XForwardedFor`],
 [`RightmostXForwardedFor`], and [`XRealIp`] extractors.
 
 They work the same way - by extracting IP from the specified header you control. The only difference
 is in the target header specification. With `SecureClientIp` you can specify the header at
-runtime, so you can use e.g. env variable for this setting (look at the implementation
+runtime, so you can use e.g. environment variable for this setting (look at the implementation
 [example][secure-example]). While with specific extractors you'd need to recompile your code if
 you'd like to change the target header (e.g. you're moving to another cloud provider). To
 mitigate this change you can create a type alias e.g. `type InsecureIp = XRealIp` and use it in
