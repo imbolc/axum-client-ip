@@ -1,5 +1,6 @@
 use crate::rudimental::{
-    Forwarded, MultiIpHeader, SingleIpHeader, StringRejection, XForwardedFor, XRealIp,
+    CfConnectingIp, FlyClientIp, Forwarded, MultiIpHeader, SingleIpHeader, StringRejection,
+    TrueClientIp, XForwardedFor, XRealIp,
 };
 use axum::async_trait;
 use axum::extract::{ConnectInfo, Extension, FromRequestParts};
@@ -30,6 +31,12 @@ pub enum SecureClientIpSource {
     RightmostXForwardedFor,
     /// IP from the `X-Real-Ip` header
     XRealIp,
+    /// IP from the `Fly-Client-IP` header
+    FlyClientIp,
+    /// IP from the `True-Client-IP` header
+    TrueClientIp,
+    /// IP from the `CF-Connecting-IP` header
+    CfConnectingIp,
     /// IP from the [`axum::extract::ConnectInfo`]
     ConnectInfo,
 }
@@ -53,6 +60,9 @@ impl SecureClientIp {
                 XForwardedFor::rightmost_ip(&parts.headers)
             }
             SecureClientIpSource::XRealIp => XRealIp::ip_from_headers(&parts.headers),
+            SecureClientIpSource::FlyClientIp => FlyClientIp::ip_from_headers(&parts.headers),
+            SecureClientIpSource::TrueClientIp => TrueClientIp::ip_from_headers(&parts.headers),
+            SecureClientIpSource::CfConnectingIp => CfConnectingIp::ip_from_headers(&parts.headers),
             SecureClientIpSource::ConnectInfo => parts
                 .extensions
                 .get::<ConnectInfo<SocketAddr>>()
