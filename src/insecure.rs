@@ -1,4 +1,7 @@
-use crate::rudimental::{Forwarded, MultiIpHeader, SingleIpHeader, XForwardedFor, XRealIp};
+use crate::rudimental::{
+    CfConnectingIp, FlyClientIp, Forwarded, MultiIpHeader, SingleIpHeader, TrueClientIp,
+    XForwardedFor, XRealIp,
+};
 use axum::{
     async_trait,
     extract::{ConnectInfo, FromRequestParts},
@@ -39,6 +42,9 @@ where
         XForwardedFor::maybe_leftmost_ip(&parts.headers)
             .or_else(|| Forwarded::maybe_leftmost_ip(&parts.headers))
             .or_else(|| XRealIp::maybe_ip_from_headers(&parts.headers))
+            .or_else(|| FlyClientIp::maybe_ip_from_headers(&parts.headers))
+            .or_else(|| TrueClientIp::maybe_ip_from_headers(&parts.headers))
+            .or_else(|| CfConnectingIp::maybe_ip_from_headers(&parts.headers))
             .or_else(|| maybe_connect_info(&parts.extensions))
             .map(Self)
             .ok_or((

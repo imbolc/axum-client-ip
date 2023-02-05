@@ -17,7 +17,8 @@
 //! ## `SecureClientIp` vs specific header extractors
 //!
 //! Apart from [`SecureClientIp`] there are [`Forwarded`], [`RightmostForwarded`], [`XForwardedFor`],
-//! [`RightmostXForwardedFor`], and [`XRealIp`] extractors.
+//! [`RightmostXForwardedFor`], [`FlyClientIp`], [`TrueClientIp`], [`CfConnectingIp`] and [`XRealIp`]
+//! extractors.
 //!
 //! They work the same way - by extracting IP from the specified header you control. The only difference
 //! is in the target header specification. With `SecureClientIp` you can specify the header at
@@ -76,8 +77,8 @@ mod rudimental;
 mod secure;
 pub use insecure::InsecureClientIp;
 pub use rudimental::{
-    Forwarded, LeftmostForwarded, LeftmostXForwardedFor, RightmostForwarded,
-    RightmostXForwardedFor, XForwardedFor, XRealIp,
+    CfConnectingIp, FlyClientIp, Forwarded, LeftmostForwarded, LeftmostXForwardedFor,
+    RightmostForwarded, RightmostXForwardedFor, TrueClientIp, XForwardedFor, XRealIp,
 };
 pub use secure::{SecureClientIp, SecureClientIpSource};
 mod rejection;

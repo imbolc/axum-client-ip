@@ -7,15 +7,6 @@ use axum::{
 };
 use std::net::IpAddr;
 
-pub(crate) const X_REAL_IP: &str = "X-Real-Ip";
-pub(crate) const X_FORWARDED_FOR: &str = "X-Forwarded-For";
-pub(crate) const FORWARDED: &str = "Forwarded";
-
-/// Extracts a valid IP from `X-Real-Ip` header
-///
-/// Rejects with a 500 error if the header is absent or the IP isn't valid
-pub struct XRealIp(pub IpAddr);
-
 /// Extracts a list of valid IP addresses from `X-Forwarded-For` header
 pub struct XForwardedFor(pub Vec<IpAddr>);
 
@@ -41,6 +32,26 @@ pub struct LeftmostForwarded(pub IpAddr);
 ///
 /// Rejects with a 500 error if the header is absent or there's no valid IP
 pub struct RightmostForwarded(pub IpAddr);
+
+/// Extracts a valid IP from `X-Real-Ip` (Nginx) header
+///
+/// Rejects with a 500 error if the header is absent or the IP isn't valid
+pub struct XRealIp(pub IpAddr);
+
+/// Extracts a valid IP from `Fly-Client-IP` (Fly.io) header
+///
+/// Rejects with a 500 error if the header is absent or the IP isn't valid
+pub struct FlyClientIp(pub IpAddr);
+
+/// Extracts a valid IP from `True-Client-IP` (Akamai, Cloudflare) header
+///
+/// Rejects with a 500 error if the header is absent or the IP isn't valid
+pub struct TrueClientIp(pub IpAddr);
+
+/// Extracts a valid IP from `CF-Connecting-IP` (Cloudflare) header
+///
+/// Rejects with a 500 error if the header is absent or the IP isn't valid
+pub struct CfConnectingIp(pub IpAddr);
 
 pub(crate) trait SingleIpHeader {
     const HEADER: &'static str;
@@ -107,26 +118,38 @@ pub(crate) trait MultiIpHeader {
     }
 }
 
-impl SingleIpHeader for XRealIp {
-    const HEADER: &'static str = X_REAL_IP;
+macro_rules! impl_single_header {
+    ($type:ty, $header:literal) => {
+        impl SingleIpHeader for $type {
+            const HEADER: &'static str = $header;
+        }
+
+        #[async_trait]
+        impl<S> FromRequestParts<S> for $type
+        where
+            S: Sync,
+        {
+            type Rejection = StringRejection;
+
+            async fn from_request_parts(
+                parts: &mut Parts,
+                _state: &S,
+            ) -> Result<Self, Self::Rejection> {
+                Ok(Self(
+                    Self::maybe_ip_from_headers(&parts.headers).ok_or_else(Self::rejection)?,
+                ))
+            }
+        }
+    };
 }
 
-#[async_trait]
-impl<S> FromRequestParts<S> for XRealIp
-where
-    S: Sync,
-{
-    type Rejection = StringRejection;
-
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        Ok(Self(
-            Self::maybe_ip_from_headers(&parts.headers).ok_or_else(Self::rejection)?,
-        ))
-    }
-}
+impl_single_header!(XRealIp, "X-Real-Ip");
+impl_single_header!(FlyClientIp, "Fly-Client-IP");
+impl_single_header!(TrueClientIp, "True-Client-IP");
+impl_single_header!(CfConnectingIp, "CF-Connecting-IP");
 
 impl MultiIpHeader for XForwardedFor {
-    const HEADER: &'static str = X_FORWARDED_FOR;
+    const HEADER: &'static str = "X-Forwarded-For";
 
     fn ips_from_header_value(header_value: &str) -> Vec<IpAddr> {
         header_value
@@ -137,7 +160,7 @@ impl MultiIpHeader for XForwardedFor {
 }
 
 impl MultiIpHeader for Forwarded {
-    const HEADER: &'static str = FORWARDED;
+    const HEADER: &'static str = "Forwarded";
 
     fn ips_from_header_value(header_value: &str) -> Vec<IpAddr> {
         use forwarded_header_value::{ForwardedHeaderValue, Identifier};
@@ -239,8 +262,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        Forwarded, LeftmostForwarded, LeftmostXForwardedFor, RightmostForwarded,
-        RightmostXForwardedFor, XForwardedFor, XRealIp,
+        CfConnectingIp, FlyClientIp, Forwarded, LeftmostForwarded, LeftmostXForwardedFor,
+        RightmostForwarded, RightmostXForwardedFor, TrueClientIp, XForwardedFor, XRealIp,
     };
     use axum::{
         body::{Body, BoxBody},
@@ -268,6 +291,66 @@ mod tests {
         let req = Request::builder()
             .uri("/")
             .header("X-Real-Ip", "1.2.3.4")
+            .body(Body::empty())
+            .unwrap();
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(res.into_body()).await, "1.2.3.4");
+    }
+
+    #[tokio::test]
+    async fn fly_client_ip() {
+        fn app() -> Router {
+            Router::new().route("/", get(|ip: FlyClientIp| async move { ip.0.to_string() }))
+        }
+
+        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let req = Request::builder()
+            .uri("/")
+            .header("Fly-Client-IP", "1.2.3.4")
+            .body(Body::empty())
+            .unwrap();
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(res.into_body()).await, "1.2.3.4");
+    }
+
+    #[tokio::test]
+    async fn true_client_ip() {
+        fn app() -> Router {
+            Router::new().route("/", get(|ip: TrueClientIp| async move { ip.0.to_string() }))
+        }
+
+        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let req = Request::builder()
+            .uri("/")
+            .header("True-Client-IP", "1.2.3.4")
+            .body(Body::empty())
+            .unwrap();
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(res.into_body()).await, "1.2.3.4");
+    }
+
+    #[tokio::test]
+    async fn cf_connecting_ip() {
+        fn app() -> Router {
+            Router::new().route(
+                "/",
+                get(|ip: CfConnectingIp| async move { ip.0.to_string() }),
+            )
+        }
+
+        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let req = Request::builder()
+            .uri("/")
+            .header("CF-Connecting-IP", "1.2.3.4")
             .body(Body::empty())
             .unwrap();
         let res = app().oneshot(req).await.unwrap();
