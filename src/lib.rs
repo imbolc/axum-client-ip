@@ -80,5 +80,5 @@ pub use rudimental::{
     CfConnectingIp, FlyClientIp, Forwarded, LeftmostForwarded, LeftmostXForwardedFor,
     RightmostForwarded, RightmostXForwardedFor, TrueClientIp, XForwardedFor, XRealIp,
 };
-pub use secure::{SecureClientIp, SecureClientIpSource};
+pub use secure::{MaybeSecureClientIp, SecureClientIp, SecureClientIpSource};
 mod rejection;

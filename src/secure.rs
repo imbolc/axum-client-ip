@@ -90,3 +90,22 @@ where
         }
     }
 }
+
+/// The same as [`SecureClientIp`] but returns the `Result` instead of rejecting on errors
+pub struct MaybeSecureClientIp(pub Result<SecureClientIp, StringRejection>);
+
+#[async_trait]
+impl<S> FromRequestParts<S> for MaybeSecureClientIp
+where
+    S: Sync,
+{
+    type Rejection = StringRejection;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        if let Some(ip_source) = parts.extensions.get() {
+            Ok(Self(SecureClientIp::from_parts(ip_source, parts)))
+        } else {
+            Err("Can't extract `SecureClientIp`, add `SecureClientIpSource` into extensions".into())
+        }
+    }
+}

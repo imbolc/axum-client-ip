@@ -4,6 +4,7 @@ use axum::{
 };
 use std::convert::Infallible;
 
+#[derive(Debug)]
 pub struct StringRejection(String);
 pub(crate) type InfallibleRejection = (StatusCode, Infallible);
 
