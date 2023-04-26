@@ -17,7 +17,7 @@ pub struct XForwardedFor(pub Vec<IpAddr>);
 #[derive(Debug)]
 pub struct LeftmostXForwardedFor(pub IpAddr);
 
-/// Extracts the leftmost IP from `X-Forwarded-For` header
+/// Extracts the rightmost IP from `X-Forwarded-For` header
 ///
 /// Rejects with a 500 error if the header is absent or there's no valid IP
 #[derive(Debug)]
