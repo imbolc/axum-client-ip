@@ -27,7 +27,7 @@ use std::{
 ///
 /// Here's a configuration [example][].
 ///
-/// [example]: https://github.com/imbolc/axum-client-ip/examples/insecure.rs
+/// [example]: https://github.com/imbolc/axum-client-ip/blob/main/examples/insecure.rs
 #[derive(Debug)]
 pub struct InsecureClientIp(pub IpAddr);
 

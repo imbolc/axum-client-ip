@@ -75,7 +75,7 @@ To fix this rearrange extractors in your handler definition moving body consumpt
 end, see [details][extractors-order].
 
 
-[secure-example]: https://github.com/imbolc/axum-client-ip/examples/secure.rs
+[secure-example]: https://github.com/imbolc/axum-client-ip/blob/main/examples/secure.rs
 [extractors-order]: https://docs.rs/axum/latest/axum/extract/index.html#the-order-of-extractors
 
 <!-- cargo-sync-readme end -->

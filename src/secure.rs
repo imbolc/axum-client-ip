@@ -18,7 +18,7 @@ use std::{
 /// Then you'd need to pass a corresponding [`SecureClientIpSource`] variant into the
 /// [`axum::routing::Router::layer`] as an extension. Look at the [example][].
 ///
-/// [example]: https://github.com/imbolc/axum-client-ip/examples/secure.rs
+/// [example]: https://github.com/imbolc/axum-client-ip/blob/main/examples/secure.rs
 #[derive(Debug)]
 pub struct SecureClientIp(pub IpAddr);
 
