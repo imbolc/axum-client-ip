@@ -120,8 +120,7 @@ pub(crate) trait MultiIpHeader {
             .iter()
             .filter_map(|hv| hv.to_str().ok())
             .flat_map(Self::ips_from_header_value)
-            .rev()
-            .next()
+            .next_back()
     }
 
     fn rightmost_ip(headers: &HeaderMap) -> Result<IpAddr, StringRejection> {
