@@ -47,6 +47,11 @@ pub struct XRealIp(pub IpAddr);
 
 /// Extracts a valid IP from `Fly-Client-IP` (Fly.io) header
 ///
+/// When [FlyClientIp] extractor is run for health check path,
+/// provide required `Fly-Client-IP` header through
+/// [`services.http_checks.headers`](https://fly.io/docs/reference/configuration/#services-http_checks)
+/// or [`http_service.checks.headers`](https://fly.io/docs/reference/configuration/#services-http_checks)
+///
 /// Rejects with a 500 error if the header is absent or the IP isn't valid
 #[derive(Debug)]
 pub struct FlyClientIp(pub IpAddr);
