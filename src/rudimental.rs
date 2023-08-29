@@ -179,7 +179,9 @@ impl MultiIpHeader for Forwarded {
     fn ips_from_header_value(header_value: &str) -> Vec<IpAddr> {
         use forwarded_header_value::{ForwardedHeaderValue, Identifier};
 
-        let Ok(fv) = ForwardedHeaderValue::from_forwarded(header_value) else {return Vec::new()};
+        let Ok(fv) = ForwardedHeaderValue::from_forwarded(header_value) else {
+            return Vec::new();
+        };
         fv.iter()
             .filter_map(|fs| fs.forwarded_for.as_ref())
             .filter_map(|ff| match ff {
