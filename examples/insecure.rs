@@ -12,7 +12,7 @@ async fn main() {
 
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
         .serve(
-            // Don't forget to add `ConnetInfo`
+            // Don't forget to add `ConnectInfo`
             app.into_make_service_with_connect_info::<SocketAddr>(),
         )
         .await
