@@ -5,7 +5,7 @@ use crate::rudimental::{
 use axum::{
     async_trait,
     extract::{ConnectInfo, FromRequestParts},
-    http::{request::Parts, Extensions, StatusCode},
+    http::{request::Parts, Extensions, HeaderMap, HeaderValue, StatusCode},
 };
 use std::{
     marker::Sync,
@@ -31,26 +31,42 @@ use std::{
 #[derive(Debug)]
 pub struct InsecureClientIp(pub IpAddr);
 
-#[async_trait]
-impl<S> FromRequestParts<S> for InsecureClientIp
-where
-    S: Sync,
-{
-    type Rejection = (StatusCode, &'static str);
+type Rejection = (StatusCode, &'static str);
 
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        XForwardedFor::maybe_leftmost_ip(&parts.headers)
-            .or_else(|| Forwarded::maybe_leftmost_ip(&parts.headers))
-            .or_else(|| XRealIp::maybe_ip_from_headers(&parts.headers))
-            .or_else(|| FlyClientIp::maybe_ip_from_headers(&parts.headers))
-            .or_else(|| TrueClientIp::maybe_ip_from_headers(&parts.headers))
-            .or_else(|| CfConnectingIp::maybe_ip_from_headers(&parts.headers))
-            .or_else(|| maybe_connect_info(&parts.extensions))
+impl InsecureClientIp {
+    /// Try to extract client IP from given arguments.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if cannot extract IP.
+    pub fn from(
+        headers: &HeaderMap<HeaderValue>,
+        extensions: &Extensions,
+    ) -> Result<Self, Rejection> {
+        XForwardedFor::maybe_leftmost_ip(headers)
+            .or_else(|| Forwarded::maybe_leftmost_ip(headers))
+            .or_else(|| XRealIp::maybe_ip_from_headers(headers))
+            .or_else(|| FlyClientIp::maybe_ip_from_headers(headers))
+            .or_else(|| TrueClientIp::maybe_ip_from_headers(headers))
+            .or_else(|| CfConnectingIp::maybe_ip_from_headers(headers))
+            .or_else(|| maybe_connect_info(extensions))
             .map(Self)
             .ok_or((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Can't extract `UnsecureClientIp`, provide `axum::extract::ConnectInfo`",
             ))
+    }
+}
+
+#[async_trait]
+impl<S> FromRequestParts<S> for InsecureClientIp
+where
+    S: Sync,
+{
+    type Rejection = Rejection;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        Self::from(&parts.headers, &parts.extensions)
     }
 }
 

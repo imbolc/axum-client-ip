@@ -5,6 +5,8 @@ use crate::rudimental::{
 use axum::async_trait;
 use axum::extract::{ConnectInfo, Extension, FromRequestParts};
 use axum::http::request::Parts;
+use axum::http::HeaderMap;
+use axum::http::{Extensions, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::{
     marker::Sync,
@@ -50,21 +52,24 @@ impl SecureClientIpSource {
 }
 
 impl SecureClientIp {
-    fn from_parts(
+    /// Try to extract client IP from given arguments.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if cannot extract IP.
+    pub fn from(
         ip_source: &SecureClientIpSource,
-        parts: &Parts,
+        headers: &HeaderMap<HeaderValue>,
+        extensions: &Extensions,
     ) -> Result<Self, StringRejection> {
         match ip_source {
-            SecureClientIpSource::RightmostForwarded => Forwarded::rightmost_ip(&parts.headers),
-            SecureClientIpSource::RightmostXForwardedFor => {
-                XForwardedFor::rightmost_ip(&parts.headers)
-            }
-            SecureClientIpSource::XRealIp => XRealIp::ip_from_headers(&parts.headers),
-            SecureClientIpSource::FlyClientIp => FlyClientIp::ip_from_headers(&parts.headers),
-            SecureClientIpSource::TrueClientIp => TrueClientIp::ip_from_headers(&parts.headers),
-            SecureClientIpSource::CfConnectingIp => CfConnectingIp::ip_from_headers(&parts.headers),
-            SecureClientIpSource::ConnectInfo => parts
-                .extensions
+            SecureClientIpSource::RightmostForwarded => Forwarded::rightmost_ip(headers),
+            SecureClientIpSource::RightmostXForwardedFor => XForwardedFor::rightmost_ip(headers),
+            SecureClientIpSource::XRealIp => XRealIp::ip_from_headers(headers),
+            SecureClientIpSource::FlyClientIp => FlyClientIp::ip_from_headers(headers),
+            SecureClientIpSource::TrueClientIp => TrueClientIp::ip_from_headers(headers),
+            SecureClientIpSource::CfConnectingIp => CfConnectingIp::ip_from_headers(headers),
+            SecureClientIpSource::ConnectInfo => extensions
                 .get::<ConnectInfo<SocketAddr>>()
                 .map(|ConnectInfo(addr)| addr.ip())
                 .ok_or_else(|| {
@@ -84,7 +89,11 @@ where
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         if let Some(ip_source) = parts.extensions.get() {
-            Ok(SecureClientIp::from_parts(ip_source, parts)?)
+            Ok(SecureClientIp::from(
+                ip_source,
+                &parts.headers,
+                &parts.extensions,
+            )?)
         } else {
             Err("Can't extract `SecureClientIp`, add `SecureClientIpSource` into extensions".into())
         }
