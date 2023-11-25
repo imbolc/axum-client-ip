@@ -80,12 +80,8 @@ fn maybe_connect_info(extensions: &Extensions) -> Option<IpAddr> {
 #[cfg(test)]
 mod tests {
     use super::InsecureClientIp;
-    use axum::{
-        body::{Body, BoxBody},
-        http::Request,
-        routing::get,
-        Router,
-    };
+    use axum::{body::Body, http::Request, routing::get, Router};
+    use http_body_util::BodyExt;
     use tower::ServiceExt;
 
     fn app() -> Router {
@@ -95,8 +91,8 @@ mod tests {
         )
     }
 
-    async fn body_string(body: BoxBody) -> String {
-        let bytes = hyper::body::to_bytes(body).await.unwrap();
+    async fn body_string(body: Body) -> String {
+        let bytes = body.collect().await.unwrap().to_bytes();
         String::from_utf8_lossy(&bytes).into()
     }
 
