@@ -22,8 +22,13 @@ async fn main() {
         // the line you're probably looking for :)
         .layer(config.ip_source.into_extension());
 
-    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
-        .serve(app.into_make_service_with_connect_info::<SocketAddr>())
-        .await
-        .unwrap()
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+    axum::serve(
+        listener,
+        // Don't forget to add `ConnectInfo`
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .unwrap()
 }

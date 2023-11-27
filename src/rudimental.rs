@@ -282,15 +282,16 @@ mod tests {
         RightmostForwarded, RightmostXForwardedFor, TrueClientIp, XForwardedFor, XRealIp,
     };
     use axum::{
-        body::{Body, BoxBody},
+        body::Body,
         http::{Request, StatusCode},
         routing::get,
         Router,
     };
+    use http_body_util::BodyExt;
     use tower::ServiceExt;
 
-    async fn body_string(body: BoxBody) -> String {
-        let bytes = hyper::body::to_bytes(body).await.unwrap();
+    async fn body_string(body: Body) -> String {
+        let bytes = body.collect().await.unwrap().to_bytes();
         String::from_utf8_lossy(&bytes).into()
     }
 
