@@ -4,7 +4,7 @@ edition = "2021"
 license = "MIT"
 name = "axum-client-ip"
 repository = "https://github.com/imbolc/axum-client-ip"
-version = "0.5.0"
+version = "0.5.1"
 
 [dependencies]
 axum = { version = "0.7", default-features = false, features = [
