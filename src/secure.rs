@@ -9,8 +9,11 @@ use axum::http::HeaderMap;
 use axum::http::{Extensions, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::{
+    error::Error,
+    fmt,
     marker::Sync,
     net::{IpAddr, SocketAddr},
+    str::FromStr,
 };
 
 /// A secure client IP extractor - can't be spoofed if configured correctly
@@ -48,6 +51,34 @@ impl SecureClientIpSource {
     /// [`axum::routing::Router::layer`]
     pub fn into_extension(self) -> Extension<Self> {
         Extension(self)
+    }
+}
+
+#[derive(Debug)]
+pub struct ParseSecureClientIpSourceError(String);
+
+impl fmt::Display for ParseSecureClientIpSourceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid SecureClientIpSource value {}", self.0)
+    }
+}
+
+impl Error for ParseSecureClientIpSourceError {}
+
+impl FromStr for SecureClientIpSource {
+    type Err = ParseSecureClientIpSourceError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "RightmostForwarded" => Self::RightmostForwarded,
+            "RightmostXForwardedFor" => Self::RightmostXForwardedFor,
+            "XRealIp" => Self::XRealIp,
+            "FlyClientIp" => Self::FlyClientIp,
+            "TrueClientIp" => Self::TrueClientIp,
+            "CfConnectingIp" => Self::CfConnectingIp,
+            "ConnectInfo" => Self::ConnectInfo,
+            _ => return Err(ParseSecureClientIpSourceError(s.to_string())),
+        })
     }
 }
 
