@@ -68,6 +68,13 @@ pub struct TrueClientIp(pub IpAddr);
 #[derive(Debug)]
 pub struct CfConnectingIp(pub IpAddr);
 
+/// Extracts a valid IP from `CloudFront-Viewer-Address` (AWS CloudFront) header
+///
+/// Rejects with a 500 error if the header is absent or the IP isn't valid
+#[cfg(feature = "aws-cloudfront")]
+#[derive(Debug)]
+pub struct CloudFrontViewerAddress(pub IpAddr);
+
 pub(crate) trait SingleIpHeader {
     const HEADER: &'static str;
 
@@ -161,6 +168,40 @@ impl_single_header!(XRealIp, "X-Real-Ip");
 impl_single_header!(FlyClientIp, "Fly-Client-IP");
 impl_single_header!(TrueClientIp, "True-Client-IP");
 impl_single_header!(CfConnectingIp, "CF-Connecting-IP");
+
+#[cfg(feature = "aws-cloudfront")]
+impl SingleIpHeader for CloudFrontViewerAddress {
+    const HEADER: &'static str = "cloudfront-viewer-address";
+
+    fn maybe_ip_from_headers(headers: &HeaderMap) -> Option<IpAddr> {
+        headers
+            .get(Self::HEADER)
+            .and_then(|hv| hv.to_str().ok())
+            // Spec: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/adding-cloudfront-headers.html#cloudfront-headers-viewer-location
+            // Note: Both IPv4 and IPv6 addresses (in the specified format) do not contain
+            //       non-ascii characters, so no need to handle percent-encoding.
+            //
+            //       CloudFront does not use `[::]:12345` style notation for IPv6 (unfortunately),
+            //       otherwise parsing via `SocketAddr` would be possible.
+            .and_then(|hv| hv.rsplit_once(':').map(|(ip, _port)| ip))
+            .and_then(|s| s.parse::<IpAddr>().ok())
+    }
+}
+
+#[cfg(feature = "aws-cloudfront")]
+#[async_trait]
+impl<S> FromRequestParts<S> for CloudFrontViewerAddress
+where
+    S: Sync,
+{
+    type Rejection = StringRejection;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        Ok(Self(
+            Self::maybe_ip_from_headers(&parts.headers).ok_or_else(Self::rejection)?,
+        ))
+    }
+}
 
 impl MultiIpHeader for XForwardedFor {
     const HEADER: &'static str = "X-Forwarded-For";
@@ -531,5 +572,57 @@ mod tests {
             .unwrap();
         let res = app().oneshot(req).await.unwrap();
         assert_eq!(body_string(res.into_body()).await, "192.0.2.60");
+    }
+
+    #[cfg(feature = "aws-cloudfront")]
+    #[tokio::test]
+    async fn cloudfront_viewer_address_ipv4() {
+        fn app() -> Router {
+            Router::new().route(
+                "/",
+                get(|ip: super::CloudFrontViewerAddress| async move { ip.0.to_string() }),
+            )
+        }
+
+        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let req = Request::builder()
+            .uri("/")
+            .header("CloudFront-Viewer-Address", "198.51.100.10:46532")
+            .body(Body::empty())
+            .unwrap();
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(res.into_body()).await, "198.51.100.10");
+    }
+
+    #[cfg(feature = "aws-cloudfront")]
+    #[tokio::test]
+    async fn cloudfront_viewer_address_ipv6() {
+        fn app() -> Router {
+            Router::new().route(
+                "/",
+                get(|ip: super::CloudFrontViewerAddress| async move { ip.0.to_string() }),
+            )
+        }
+
+        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let req = Request::builder()
+            .uri("/")
+            .header(
+                "CloudFront-Viewer-Address",
+                "2a09:bac1:3b20:38::17e:7:51786",
+            )
+            .body(Body::empty())
+            .unwrap();
+        let res = app().oneshot(req).await.unwrap();
+        assert_eq!(
+            body_string(res.into_body()).await,
+            "2a09:bac1:3b20:38::17e:7"
+        );
     }
 }
