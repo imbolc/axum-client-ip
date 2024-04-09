@@ -71,7 +71,6 @@ pub struct CfConnectingIp(pub IpAddr);
 /// Extracts a valid IP from `CloudFront-Viewer-Address` (AWS CloudFront) header
 ///
 /// Rejects with a 500 error if the header is absent or the IP isn't valid
-#[cfg(feature = "aws-cloudfront")]
 #[derive(Debug)]
 pub struct CloudFrontViewerAddress(pub IpAddr);
 
@@ -169,7 +168,6 @@ impl_single_header!(FlyClientIp, "Fly-Client-IP");
 impl_single_header!(TrueClientIp, "True-Client-IP");
 impl_single_header!(CfConnectingIp, "CF-Connecting-IP");
 
-#[cfg(feature = "aws-cloudfront")]
 impl SingleIpHeader for CloudFrontViewerAddress {
     const HEADER: &'static str = "cloudfront-viewer-address";
 
@@ -188,7 +186,6 @@ impl SingleIpHeader for CloudFrontViewerAddress {
     }
 }
 
-#[cfg(feature = "aws-cloudfront")]
 #[async_trait]
 impl<S> FromRequestParts<S> for CloudFrontViewerAddress
 where
@@ -574,7 +571,6 @@ mod tests {
         assert_eq!(body_string(res.into_body()).await, "192.0.2.60");
     }
 
-    #[cfg(feature = "aws-cloudfront")]
     #[tokio::test]
     async fn cloudfront_viewer_address_ipv4() {
         fn app() -> Router {
@@ -597,7 +593,6 @@ mod tests {
         assert_eq!(body_string(res.into_body()).await, "198.51.100.10");
     }
 
-    #[cfg(feature = "aws-cloudfront")]
     #[tokio::test]
     async fn cloudfront_viewer_address_ipv6() {
         fn app() -> Router {
