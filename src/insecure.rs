@@ -1,6 +1,6 @@
 use crate::rudimental::{
-    CfConnectingIp, FlyClientIp, Forwarded, MultiIpHeader, SingleIpHeader, TrueClientIp,
-    XForwardedFor, XRealIp,
+    CfConnectingIp, CloudFrontViewerAddress, FlyClientIp, Forwarded, MultiIpHeader, SingleIpHeader,
+    TrueClientIp, XForwardedFor, XRealIp,
 };
 use axum::{
     async_trait,
@@ -49,6 +49,7 @@ impl InsecureClientIp {
             .or_else(|| FlyClientIp::maybe_ip_from_headers(headers))
             .or_else(|| TrueClientIp::maybe_ip_from_headers(headers))
             .or_else(|| CfConnectingIp::maybe_ip_from_headers(headers))
+            .or_else(|| CloudFrontViewerAddress::maybe_ip_from_headers(headers))
             .or_else(|| maybe_connect_info(extensions))
             .map(Self)
             .ok_or((

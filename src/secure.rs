@@ -1,6 +1,6 @@
 use crate::rudimental::{
-    CfConnectingIp, FlyClientIp, Forwarded, MultiIpHeader, SingleIpHeader, StringRejection,
-    TrueClientIp, XForwardedFor, XRealIp,
+    CfConnectingIp, CloudFrontViewerAddress, FlyClientIp, Forwarded, MultiIpHeader, SingleIpHeader,
+    StringRejection, TrueClientIp, XForwardedFor, XRealIp,
 };
 use axum::async_trait;
 use axum::extract::{ConnectInfo, Extension, FromRequestParts};
@@ -44,6 +44,8 @@ pub enum SecureClientIpSource {
     CfConnectingIp,
     /// IP from the [`axum::extract::ConnectInfo`]
     ConnectInfo,
+    /// IP from the `CloudFront-Viewer-Address` header
+    CloudFrontViewerAddress,
 }
 
 impl SecureClientIpSource {
@@ -77,6 +79,7 @@ impl FromStr for SecureClientIpSource {
             "TrueClientIp" => Self::TrueClientIp,
             "CfConnectingIp" => Self::CfConnectingIp,
             "ConnectInfo" => Self::ConnectInfo,
+            "CloudFrontViewerAddress" => Self::CloudFrontViewerAddress,
             _ => return Err(ParseSecureClientIpSourceError(s.to_string())),
         })
     }
@@ -100,6 +103,9 @@ impl SecureClientIp {
             SecureClientIpSource::FlyClientIp => FlyClientIp::ip_from_headers(headers),
             SecureClientIpSource::TrueClientIp => TrueClientIp::ip_from_headers(headers),
             SecureClientIpSource::CfConnectingIp => CfConnectingIp::ip_from_headers(headers),
+            SecureClientIpSource::CloudFrontViewerAddress => {
+                CloudFrontViewerAddress::ip_from_headers(headers)
+            }
             SecureClientIpSource::ConnectInfo => extensions
                 .get::<ConnectInfo<SocketAddr>>()
                 .map(|ConnectInfo(addr)| addr.ip())
