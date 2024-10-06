@@ -1,50 +1,99 @@
-on: [push, pull_request]
+name: CI
+on:
+  push:
+    branches:
+      - main
+      - ci
+  pull_request:
 
-name: Continuous integration
-
-jobs:
-  check:
+  rustfmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Nightly Rust
+        uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
-          components: rustfmt, clippy
+          toolchain: nightly
+          components: rustfmt
 
-      - name: Check
-        run: cargo check --all-features --workspace --bins --examples --tests
-
-      - name: Format
+      - name: Rustfmt
         run: cargo fmt -- --check
 
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Stable Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+
       - name: Clippy
-        run: cargo clippy --all-features --workspace --bins --examples --tests -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Stable Rust
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
 
-      - name: Test
-        run: cargo test --all-features --workspace --bins --examples --tests
+      - name: Test all targets
+        run: cargo test --all-targets --all-features
+
+      - name: Test docs
+        run: cargo test --doc
 
   typos:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Check typos
+        uses: crate-ci/typos@master
+        with:
+          files: .
+
+  cargo_sort:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Stable Rust
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
 
-      - name: Install `typos`
-        uses: actions-rs/install@v0.1
-        with:
-          crate: typos-cli
-          version: latest
+      - name: Install cargo-sort
+        run: cargo install --locked cargo-sort
 
-      - name: Any typos?
-        run: typos
+      - name: Check `Cargo.toml` sort
+        run: cargo sort -c
+
+  machete:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Stable Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install `cargo-machete`
+        run: cargo install --locked cargo-machete
+
+      - name: Check unused Cargo dependencies
+        run: cargo machete
