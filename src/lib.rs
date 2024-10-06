@@ -2,14 +2,16 @@
 //!
 //! ## Why different extractors?
 //!
-//! There are two distinct use cases for client IP which should be treated differently:
+//! There are two distinct use cases for client IP which should be treated
+//! differently:
 //!
-//! 1. You can't tolerate the possibility of spoofing (you're working on rate limiting,
-//!    spam protection, etc). In this case, you should use [`SecureClientIp`] or an extractor for a
-//!    particular header.
-//! 2. You can trade potential spoofing for a statistically better IP determination. E.g. you use
-//!    the IP for geolocation when the correctness of the location isn't critical for your app. For
-//!    something like this, you can use [`InsecureClientIp`].
+//! 1. You can't tolerate the possibility of spoofing (you're working on rate
+//!    limiting, spam protection, etc). In this case, you should use
+//!    [`SecureClientIp`] or an extractor for a particular header.
+//! 2. You can trade potential spoofing for a statistically better IP
+//!    determination. E.g. you use the IP for geolocation when the correctness
+//!    of the location isn't critical for your app. For something like this, you
+//!    can use [`InsecureClientIp`].
 //!
 //! For a deep dive into the trade-off refer to this Adam Pritchard's
 //! [article](https://adam-p.ca/blog/2022/03/x-forwarded-for/)
@@ -26,16 +28,18 @@
 //! [`TrueClientIp`],
 //! [`XForwardedFor`],
 //! [`XRealIp`]
-//! secure extractors. You can use them directly if your code assumes a specific proxy
-//! configuration.
+//! secure extractors. You can use them directly if your code assumes a specific
+//! proxy configuration.
 //!
-//! They work the same way - by extracting IP from the specified header you control. The only difference
-//! is in the target header specification. With `SecureClientIp` you can specify the header at
-//! runtime, so you can use e.g. environment variable for this setting (look at the implementation
-//! [example][secure-example]). While with specific extractors you'd need to recompile your code if
-//! you'd like to change the target header (e.g. you're moving to another cloud provider). To
-//! mitigate this change you can create a type alias e.g. `type InsecureIp = XRealIp` and use it in
-//! your handlers, then the change will affect only one line.
+//! They work the same way - by extracting IP from the specified header you
+//! control. The only difference is in the target header specification. With
+//! `SecureClientIp` you can specify the header at runtime, so you can use e.g.
+//! environment variable for this setting (look at the implementation
+//! [example][secure-example]). While with specific extractors you'd need to
+//! recompile your code if you'd like to change the target header (e.g. you're
+//! moving to another cloud provider). To mitigate this change you can create a
+//! type alias e.g. `type InsecureIp = XRealIp` and use it in your handlers,
+//! then the change will affect only one line.
 //!
 //! ## Usage
 //!
@@ -72,10 +76,10 @@
 //!
 //! ## A common issue with Axum extractors
 //!
-//! The most often issue with this extractor is using it after one consuming body e.g.
-//! [`axum::extract::Json`].
-//! To fix this rearrange extractors in your handler definition moving body consumption to the
-//! end, see [details][extractors-order].
+//! The most often issue with this extractor is using it after one consuming
+//! body e.g. [`axum::extract::Json`].
+//! To fix this rearrange extractors in your handler definition moving body
+//! consumption to the end, see [details][extractors-order].
 //!
 //!
 //! [secure-example]: https://github.com/imbolc/axum-client-ip/blob/main/examples/secure.rs

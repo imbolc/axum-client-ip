@@ -1,11 +1,13 @@
-use crate::rejection::InfallibleRejection;
-pub use crate::rejection::StringRejection;
+use std::net::IpAddr;
+
 use axum::{
     async_trait,
     extract::FromRequestParts,
     http::{request::Parts, HeaderMap},
 };
-use std::net::IpAddr;
+
+use crate::rejection::InfallibleRejection;
+pub use crate::rejection::StringRejection;
 
 /// Extracts a list of valid IP addresses from `X-Forwarded-For` header
 #[derive(Debug)]
@@ -311,10 +313,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        CfConnectingIp, FlyClientIp, Forwarded, LeftmostForwarded, LeftmostXForwardedFor,
-        RightmostForwarded, RightmostXForwardedFor, TrueClientIp, XForwardedFor, XRealIp,
-    };
     use axum::{
         body::Body,
         http::{Request, StatusCode},
@@ -323,6 +321,11 @@ mod tests {
     };
     use http_body_util::BodyExt;
     use tower::ServiceExt;
+
+    use super::{
+        CfConnectingIp, FlyClientIp, Forwarded, LeftmostForwarded, LeftmostXForwardedFor,
+        RightmostForwarded, RightmostXForwardedFor, TrueClientIp, XForwardedFor, XRealIp,
+    };
 
     async fn body_string(body: Body) -> String {
         let bytes = body.collect().await.unwrap().to_bytes();

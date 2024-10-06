@@ -1,26 +1,31 @@
-use crate::rudimental::{
-    CfConnectingIp, CloudFrontViewerAddress, FlyClientIp, Forwarded, MultiIpHeader, SingleIpHeader,
-    TrueClientIp, XForwardedFor, XRealIp,
-};
-use axum::{
-    async_trait,
-    extract::{ConnectInfo, FromRequestParts},
-    http::{request::Parts, Extensions, HeaderMap, HeaderValue, StatusCode},
-};
 use std::{
     marker::Sync,
     net::{IpAddr, SocketAddr},
 };
 
-/// An insecure client IP extractor - no security, but somehow better IP determination
+use axum::{
+    async_trait,
+    extract::{ConnectInfo, FromRequestParts},
+    http::{request::Parts, Extensions, HeaderMap, HeaderValue, StatusCode},
+};
+
+use crate::rudimental::{
+    CfConnectingIp, CloudFrontViewerAddress, FlyClientIp, Forwarded, MultiIpHeader, SingleIpHeader,
+    TrueClientIp, XForwardedFor, XRealIp,
+};
+
+/// An insecure client IP extractor - no security, but somehow better IP
+/// determination
 ///
-/// This extractor is meant for cases when you'd prefer to **sacrifice security** for probably
-/// statistically **better IP determination**. A good usage example would be IP-based geolocation if
-/// the wrong location won't be a security issue for your app. But for something like rate limiting you
+/// This extractor is meant for cases when you'd prefer to **sacrifice
+/// security** for probably statistically **better IP determination**. A good
+/// usage example would be IP-based geolocation if the wrong location won't be a
+/// security issue for your app. But for something like rate limiting you
 /// certainly should use [`crate::SecureClientIp`] instead.
 ///
-/// Technically it means looking for leftmost IP addresses provided by forward proxy first, and then look into single
-/// IP headers like `X-Real-Ip`, and then falling back to the [`axum::extract::ConnectInfo`].
+/// Technically it means looking for leftmost IP addresses provided by forward
+/// proxy first, and then look into single IP headers like `X-Real-Ip`, and then
+/// falling back to the [`axum::extract::ConnectInfo`].
 ///
 /// It returns a 500 error if you forget to provide the `ConnectInfo` with e.g.
 /// [`axum::routing::Router::into_make_service_with_connect_info`]
@@ -80,10 +85,11 @@ fn maybe_connect_info(extensions: &Extensions) -> Option<IpAddr> {
 
 #[cfg(test)]
 mod tests {
-    use super::InsecureClientIp;
     use axum::{body::Body, http::Request, routing::get, Router};
     use http_body_util::BodyExt;
     use tower::ServiceExt;
+
+    use super::InsecureClientIp;
 
     fn app() -> Router {
         Router::new().route(

@@ -1,6 +1,7 @@
+use std::net::SocketAddr;
+
 use axum::{routing::get, Router};
 use axum_client_ip::InsecureClientIp;
-use std::net::SocketAddr;
 
 async fn handler(InsecureClientIp(ip): InsecureClientIp) -> String {
     ip.to_string()

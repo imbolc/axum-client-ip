@@ -1,8 +1,10 @@
 //! An example of configuring `SecureClientIp` using an env variable
-//! Don't forget set the variable before running e.g.: `IP_SOURCE=ConnectInfo cargo run --example secure`
+//! Don't forget set the variable before running e.g.: `IP_SOURCE=ConnectInfo
+//! cargo run --example secure`
+use std::net::SocketAddr;
+
 use axum::{routing::get, Router};
 use axum_client_ip::{SecureClientIp, SecureClientIpSource};
-use std::net::SocketAddr;
 
 #[derive(serde::Deserialize)]
 struct Config {

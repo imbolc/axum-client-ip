@@ -1,8 +1,9 @@
+use std::convert::Infallible;
+
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use std::convert::Infallible;
 
 #[derive(Debug)]
 pub struct StringRejection(String);

@@ -1,13 +1,3 @@
-use crate::rudimental::{
-    CfConnectingIp, CloudFrontViewerAddress, FlyClientIp, Forwarded, MultiIpHeader, SingleIpHeader,
-    StringRejection, TrueClientIp, XForwardedFor, XRealIp,
-};
-use axum::async_trait;
-use axum::extract::{ConnectInfo, Extension, FromRequestParts};
-use axum::http::request::Parts;
-use axum::http::HeaderMap;
-use axum::http::{Extensions, HeaderValue};
-use serde::{Deserialize, Serialize};
 use std::{
     error::Error,
     fmt,
@@ -16,12 +6,25 @@ use std::{
     str::FromStr,
 };
 
+use axum::{
+    async_trait,
+    extract::{ConnectInfo, Extension, FromRequestParts},
+    http::{request::Parts, Extensions, HeaderMap, HeaderValue},
+};
+use serde::{Deserialize, Serialize};
+
+use crate::rudimental::{
+    CfConnectingIp, CloudFrontViewerAddress, FlyClientIp, Forwarded, MultiIpHeader, SingleIpHeader,
+    StringRejection, TrueClientIp, XForwardedFor, XRealIp,
+};
+
 /// A secure client IP extractor - can't be spoofed if configured correctly
 ///
-/// The configuration would include knowing the header the last proxy (the one you own or
-/// the one your cloud server provides) is using to store user connection IP.
-/// Then you'd need to pass a corresponding [`SecureClientIpSource`] variant into the
-/// [`axum::routing::Router::layer`] as an extension. Look at the [example][].
+/// The configuration would include knowing the header the last proxy (the one
+/// you own or the one your cloud server provides) is using to store user
+/// connection IP. Then you'd need to pass a corresponding
+/// [`SecureClientIpSource`] variant into the [`axum::routing::Router::layer`]
+/// as an extension. Look at the [example][].
 ///
 /// [example]: https://github.com/imbolc/axum-client-ip/blob/main/examples/secure.rs
 #[derive(Debug)]
@@ -49,8 +52,8 @@ pub enum SecureClientIpSource {
 }
 
 impl SecureClientIpSource {
-    /// Wraps `SecureClientIpSource` into the [`axum::extract::Extension`] for passing to
-    /// [`axum::routing::Router::layer`]
+    /// Wraps `SecureClientIpSource` into the [`axum::extract::Extension`] for
+    /// passing to [`axum::routing::Router::layer`]
     pub fn into_extension(self) -> Extension<Self> {
         Extension(self)
     }
