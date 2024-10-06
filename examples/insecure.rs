@@ -12,6 +12,8 @@ async fn main() {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+
+    println!("Listening on http://localhost:3000/");
     axum::serve(
         listener,
         // Don't forget to add `ConnectInfo`
