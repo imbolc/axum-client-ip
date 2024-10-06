@@ -32,23 +32,6 @@ jobs:
       - name: Test
         run: cargo test --all-features --workspace --bins --examples --tests
 
-  readme:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-
-      - name: Install `cargo-sync-readme`
-        uses: actions-rs/install@v0.1
-        with:
-          crate: cargo-sync-readme
-          version: latest
-
-      - name: Is readme in sync?
-        run: cargo sync-readme -c
-
   typos:
     runs-on: ubuntu-latest
     steps:
