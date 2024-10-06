@@ -116,10 +116,6 @@ pub(crate) trait MultiIpHeader {
             .next()
     }
 
-    fn leftmost_ip(headers: &HeaderMap) -> Result<IpAddr, StringRejection> {
-        Self::maybe_leftmost_ip(headers).ok_or_else(|| Self::rejection())
-    }
-
     fn maybe_rightmost_ip(headers: &HeaderMap) -> Option<IpAddr> {
         headers
             .get_all(Self::HEADER)

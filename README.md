@@ -24,9 +24,18 @@ For a deep dive into the trade-off refer to this Adam Pritchard's
 
 ## `SecureClientIp` vs specific header extractors
 
-Apart from [`SecureClientIp`] there are [`Forwarded`], [`RightmostForwarded`], [`XForwardedFor`],
-[`RightmostXForwardedFor`], [`FlyClientIp`], [`TrueClientIp`], [`CfConnectingIp`] and [`XRealIp`]
-extractors.
+Apart from [`SecureClientIp`] there are concrete
+[`CfConnectingIp`],
+[`CloudFrontViewerAddress`] and
+[`FlyClientIp`],
+[`Forwarded`],
+[`RightmostForwarded`],
+[`RightmostXForwardedFor`],
+[`TrueClientIp`],
+[`XForwardedFor`],
+[`XRealIp`]
+secure extractors. You can use them directly if your code assumes a specific proxy
+configuration.
 
 They work the same way - by extracting IP from the specified header you control. The only difference
 is in the target header specification. With `SecureClientIp` you can specify the header at
