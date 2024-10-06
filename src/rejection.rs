@@ -4,7 +4,9 @@ use axum::{
 };
 use std::convert::Infallible;
 
+#[derive(Debug)]
 pub struct StringRejection(String);
+
 pub(crate) type InfallibleRejection = (StatusCode, Infallible);
 
 impl<T: Into<String>> From<T> for StringRejection {
@@ -16,5 +18,17 @@ impl<T: Into<String>> From<T> for StringRejection {
 impl IntoResponse for StringRejection {
     fn into_response(self) -> Response {
         (StatusCode::INTERNAL_SERVER_ERROR, self.0).into_response()
+    }
+}
+
+impl std::fmt::Display for StringRejection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for StringRejection {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
     }
 }
