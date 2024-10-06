@@ -6,8 +6,7 @@ use axum::{
     http::{request::Parts, HeaderMap},
 };
 
-use crate::rejection::InfallibleRejection;
-pub use crate::rejection::StringRejection;
+use crate::rejection::{InfallibleRejection, StringRejection};
 
 /// Extracts a list of valid IP addresses from `X-Forwarded-For` header
 #[derive(Debug)]
@@ -339,16 +338,16 @@ mod tests {
         }
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
         let req = Request::builder()
             .uri("/")
             .header("X-Real-Ip", "1.2.3.4")
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "1.2.3.4");
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(resp.into_body()).await, "1.2.3.4");
     }
 
     #[tokio::test]
@@ -358,16 +357,16 @@ mod tests {
         }
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
         let req = Request::builder()
             .uri("/")
             .header("Fly-Client-IP", "1.2.3.4")
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "1.2.3.4");
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(resp.into_body()).await, "1.2.3.4");
     }
 
     #[tokio::test]
@@ -377,16 +376,16 @@ mod tests {
         }
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
         let req = Request::builder()
             .uri("/")
             .header("True-Client-IP", "1.2.3.4")
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "1.2.3.4");
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(resp.into_body()).await, "1.2.3.4");
     }
 
     #[tokio::test]
@@ -399,16 +398,16 @@ mod tests {
         }
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
         let req = Request::builder()
             .uri("/")
             .header("CF-Connecting-IP", "1.2.3.4")
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "1.2.3.4");
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(resp.into_body()).await, "1.2.3.4");
     }
 
     #[tokio::test]
@@ -421,8 +420,8 @@ mod tests {
         }
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "[]");
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(resp.into_body()).await, "[]");
 
         let req = Request::builder()
             .uri("/")
@@ -434,9 +433,9 @@ mod tests {
             .header("X-Forwarded-For", "2.2.2.2")
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
+        let resp = app().oneshot(req).await.unwrap();
         assert_eq!(
-            body_string(res.into_body()).await,
+            body_string(resp.into_body()).await,
             "[1.1.1.1, 2001:db8:85a3:8d3:1319:8a2e:370:7348, 2.2.2.2]"
         );
     }
@@ -451,8 +450,8 @@ mod tests {
         }
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
         let req = Request::builder()
             .uri("/")
@@ -464,8 +463,8 @@ mod tests {
             .header("X-Forwarded-For", "2.2.2.2")
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "1.1.1.1");
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(resp.into_body()).await, "1.1.1.1");
     }
 
     #[tokio::test]
@@ -478,8 +477,8 @@ mod tests {
         }
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
         let req = Request::builder()
             .uri("/")
@@ -491,8 +490,8 @@ mod tests {
             .header("X-Forwarded-For", "2.2.2.2, 3.3.3.3")
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "3.3.3.3");
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(resp.into_body()).await, "3.3.3.3");
     }
 
     #[tokio::test]
@@ -505,8 +504,8 @@ mod tests {
         }
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "[]");
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(resp.into_body()).await, "[]");
 
         let req = Request::builder()
             .uri("/")
@@ -515,9 +514,9 @@ mod tests {
             .header("Forwarded", r#"for=192.0.2.60;proto=http;by=203.0.113.43"#)
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
+        let resp = app().oneshot(req).await.unwrap();
         assert_eq!(
-            body_string(res.into_body()).await,
+            body_string(resp.into_body()).await,
             "[2001:db8:cafe::17, 192.0.2.60]"
         );
     }
@@ -532,8 +531,8 @@ mod tests {
         }
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
         let req = Request::builder()
             .uri("/")
@@ -542,8 +541,8 @@ mod tests {
             .header("Forwarded", r#"for=192.0.2.60;proto=http;by=203.0.113.43"#)
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "2001:db8:cafe::17");
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(resp.into_body()).await, "2001:db8:cafe::17");
     }
 
     #[tokio::test]
@@ -556,8 +555,8 @@ mod tests {
         }
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
         let req = Request::builder()
             .uri("/")
@@ -566,12 +565,12 @@ mod tests {
             .header("Forwarded", r#"for=192.0.2.60;proto=http;by=203.0.113.43"#)
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "192.0.2.60");
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(resp.into_body()).await, "192.0.2.60");
     }
 
     #[tokio::test]
-    async fn cloudfront_viewer_address_ipv4() {
+    async fn cloudfront_viewer_addresps_ipv4() {
         fn app() -> Router {
             Router::new().route(
                 "/",
@@ -580,20 +579,20 @@ mod tests {
         }
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
         let req = Request::builder()
             .uri("/")
             .header("CloudFront-Viewer-Address", "198.51.100.10:46532")
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "198.51.100.10");
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(resp.into_body()).await, "198.51.100.10");
     }
 
     #[tokio::test]
-    async fn cloudfront_viewer_address_ipv6() {
+    async fn cloudfront_viewer_addresps_ipv6() {
         fn app() -> Router {
             Router::new().route(
                 "/",
@@ -602,8 +601,8 @@ mod tests {
         }
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
         let req = Request::builder()
             .uri("/")
@@ -613,9 +612,9 @@ mod tests {
             )
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
+        let resp = app().oneshot(req).await.unwrap();
         assert_eq!(
-            body_string(res.into_body()).await,
+            body_string(resp.into_body()).await,
             "2a09:bac1:3b20:38::17e:7"
         );
     }

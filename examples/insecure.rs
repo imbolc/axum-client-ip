@@ -1,3 +1,4 @@
+//! Insecure IP extraction for arguably better IP determination
 use std::net::SocketAddr;
 
 use axum::{routing::get, Router};

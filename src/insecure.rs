@@ -110,8 +110,8 @@ mod tests {
             .header("X-Forwarded-For", "1.1.1.1, 2.2.2.2")
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "1.1.1.1");
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(resp.into_body()).await, "1.1.1.1");
     }
 
     #[tokio::test]
@@ -121,8 +121,8 @@ mod tests {
             .header("X-Real-Ip", "1.2.3.4")
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "1.2.3.4");
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(resp.into_body()).await, "1.2.3.4");
     }
 
     #[tokio::test]
@@ -132,8 +132,8 @@ mod tests {
             .header("Forwarded", "For=\"[2001:db8:cafe::17]:4711\"")
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "2001:db8:cafe::17");
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(resp.into_body()).await, "2001:db8:cafe::17");
     }
 
     #[tokio::test]
@@ -146,7 +146,7 @@ mod tests {
             .header("Forwarded", "for=1.1.1.1;proto=https;by=2.2.2.2")
             .body(Body::empty())
             .unwrap();
-        let res = app().oneshot(req).await.unwrap();
-        assert_eq!(body_string(res.into_body()).await, "1.1.1.1");
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_string(resp.into_body()).await, "1.1.1.1");
     }
 }

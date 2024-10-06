@@ -1,5 +1,4 @@
 #![doc = include_str!("../README.md")]
-#![warn(clippy::all, missing_docs, nonstandard_style, future_incompatible)]
 
 mod insecure;
 mod rudimental;
@@ -11,4 +10,4 @@ pub use rudimental::{
     XRealIp,
 };
 pub use secure::{SecureClientIp, SecureClientIpSource};
-mod rejection;
+pub(crate) mod rejection;

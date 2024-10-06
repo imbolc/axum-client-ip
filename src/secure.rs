@@ -13,9 +13,12 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::rudimental::{
-    CfConnectingIp, CloudFrontViewerAddress, FlyClientIp, Forwarded, MultiIpHeader, SingleIpHeader,
-    StringRejection, TrueClientIp, XForwardedFor, XRealIp,
+use crate::{
+    rejection::StringRejection,
+    rudimental::{
+        CfConnectingIp, CloudFrontViewerAddress, FlyClientIp, Forwarded, MultiIpHeader,
+        SingleIpHeader, TrueClientIp, XForwardedFor, XRealIp,
+    },
 };
 
 /// A secure client IP extractor - can't be spoofed if configured correctly
@@ -54,7 +57,7 @@ pub enum SecureClientIpSource {
 impl SecureClientIpSource {
     /// Wraps `SecureClientIpSource` into the [`axum::extract::Extension`] for
     /// passing to [`axum::routing::Router::layer`]
-    pub fn into_extension(self) -> Extension<Self> {
+    pub const fn into_extension(self) -> Extension<Self> {
         Extension(self)
     }
 }
@@ -129,11 +132,7 @@ where
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         if let Some(ip_source) = parts.extensions.get() {
-            Ok(SecureClientIp::from(
-                ip_source,
-                &parts.headers,
-                &parts.extensions,
-            )?)
+            Ok(Self::from(ip_source, &parts.headers, &parts.extensions)?)
         } else {
             Err("Can't extract `SecureClientIp`, add `SecureClientIpSource` into extensions".into())
         }
