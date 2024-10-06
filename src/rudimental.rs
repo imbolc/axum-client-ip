@@ -15,13 +15,13 @@ pub struct XForwardedFor(pub Vec<IpAddr>);
 /// Extracts the leftmost IP from `X-Forwarded-For` header
 ///
 /// Rejects with a 500 error if the header is absent or there's no valid IP
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct LeftmostXForwardedFor(pub IpAddr);
 
 /// Extracts the rightmost IP from `X-Forwarded-For` header
 ///
 /// Rejects with a 500 error if the header is absent or there's no valid IP
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct RightmostXForwardedFor(pub IpAddr);
 
 /// Extracts a list of valid IP addresses from `Forwarded` header
@@ -31,19 +31,19 @@ pub struct Forwarded(pub Vec<IpAddr>);
 /// Extracts the leftmost IP from `Forwarded` header
 ///
 /// Rejects with a 500 error if the header is absent or there's no valid IP
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct LeftmostForwarded(pub IpAddr);
 
 /// Extracts the rightmost IP from `Forwarded` header
 ///
 /// Rejects with a 500 error if the header is absent or there's no valid IP
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct RightmostForwarded(pub IpAddr);
 
 /// Extracts a valid IP from `X-Real-Ip` (Nginx) header
 ///
 /// Rejects with a 500 error if the header is absent or the IP isn't valid
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct XRealIp(pub IpAddr);
 
 /// Extracts a valid IP from `Fly-Client-IP` (Fly.io) header
@@ -54,25 +54,25 @@ pub struct XRealIp(pub IpAddr);
 /// or [`http_service.checks.headers`](https://fly.io/docs/reference/configuration/#services-http_checks)
 ///
 /// Rejects with a 500 error if the header is absent or the IP isn't valid
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct FlyClientIp(pub IpAddr);
 
 /// Extracts a valid IP from `True-Client-IP` (Akamai, Cloudflare) header
 ///
 /// Rejects with a 500 error if the header is absent or the IP isn't valid
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct TrueClientIp(pub IpAddr);
 
 /// Extracts a valid IP from `CF-Connecting-IP` (Cloudflare) header
 ///
 /// Rejects with a 500 error if the header is absent or the IP isn't valid
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct CfConnectingIp(pub IpAddr);
 
 /// Extracts a valid IP from `CloudFront-Viewer-Address` (AWS CloudFront) header
 ///
 /// Rejects with a 500 error if the header is absent or the IP isn't valid
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct CloudFrontViewerAddress(pub IpAddr);
 
 pub(crate) trait SingleIpHeader {

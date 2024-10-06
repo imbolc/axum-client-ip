@@ -30,7 +30,7 @@ use crate::{
 /// as an extension. Look at the [example][].
 ///
 /// [example]: https://github.com/imbolc/axum-client-ip/blob/main/examples/secure.rs
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct SecureClientIp(pub IpAddr);
 
 /// [`SecureClientIp`] source configuration

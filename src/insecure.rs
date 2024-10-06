@@ -33,7 +33,7 @@ use crate::rudimental::{
 /// Here's a configuration [example][].
 ///
 /// [example]: https://github.com/imbolc/axum-client-ip/blob/main/examples/insecure.rs
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct InsecureClientIp(pub IpAddr);
 
 type Rejection = (StatusCode, &'static str);

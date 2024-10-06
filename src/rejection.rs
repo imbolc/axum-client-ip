@@ -28,8 +28,4 @@ impl std::fmt::Display for StringRejection {
     }
 }
 
-impl std::error::Error for StringRejection {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
+impl std::error::Error for StringRejection {}
