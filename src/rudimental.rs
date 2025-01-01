@@ -1,7 +1,6 @@
 use std::net::IpAddr;
 
 use axum::{
-    async_trait,
     extract::FromRequestParts,
     http::{request::Parts, HeaderMap},
 };
@@ -141,7 +140,6 @@ macro_rules! impl_single_header {
             const HEADER: &'static str = $header;
         }
 
-        #[async_trait]
         impl<S> FromRequestParts<S> for $type
         where
             S: Sync,
@@ -183,7 +181,6 @@ impl SingleIpHeader for CloudFrontViewerAddress {
     }
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for CloudFrontViewerAddress
 where
     S: Sync,
@@ -228,7 +225,6 @@ impl MultiIpHeader for Forwarded {
     }
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for XForwardedFor
 where
     S: Sync,
@@ -240,7 +236,6 @@ where
     }
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for LeftmostXForwardedFor
 where
     S: Sync,
@@ -255,7 +250,6 @@ where
     }
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for RightmostXForwardedFor
 where
     S: Sync,
@@ -270,7 +264,6 @@ where
     }
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for Forwarded
 where
     S: Sync,
@@ -282,7 +275,6 @@ where
     }
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for LeftmostForwarded
 where
     S: Sync,
@@ -296,7 +288,6 @@ where
     }
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for RightmostForwarded
 where
     S: Sync,

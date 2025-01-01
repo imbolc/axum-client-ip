@@ -7,7 +7,6 @@ use std::{
 };
 
 use axum::{
-    async_trait,
     extract::{ConnectInfo, Extension, FromRequestParts},
     http::{request::Parts, Extensions, HeaderMap, HeaderValue},
 };
@@ -123,7 +122,6 @@ impl SecureClientIp {
     }
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for SecureClientIp
 where
     S: Sync,
