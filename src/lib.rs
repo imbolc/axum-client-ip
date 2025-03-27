@@ -14,7 +14,7 @@ mod basic {
 
     use axum::{
         extract::FromRequestParts,
-        http::{HeaderMap, request::Parts},
+        http::{HeaderMap, HeaderName, request::Parts},
     };
 
     use crate::rejection::{InfallibleRejection, StringRejection};
@@ -88,7 +88,7 @@ mod basic {
     pub struct CloudFrontViewerAddress(pub IpAddr);
 
     pub(crate) trait SingleIpHeader {
-        const HEADER: &'static str;
+        const HEADER: HeaderName;
 
         fn maybe_ip_from_headers(headers: &HeaderMap) -> Option<IpAddr> {
             headers
@@ -107,7 +107,7 @@ mod basic {
     }
 
     pub(crate) trait MultiIpHeader {
-        const HEADER: &'static str;
+        const HEADER: HeaderName;
 
         fn ips_from_header_value(header_value: &str) -> Vec<IpAddr>;
 
@@ -150,7 +150,7 @@ mod basic {
     macro_rules! impl_single_header {
         ($type:ty, $header:literal) => {
             impl SingleIpHeader for $type {
-                const HEADER: &'static str = $header;
+                const HEADER: HeaderName = HeaderName::from_static($header);
             }
 
             impl<S> FromRequestParts<S> for $type
@@ -171,13 +171,13 @@ mod basic {
         };
     }
 
-    impl_single_header!(XRealIp, "X-Real-Ip");
-    impl_single_header!(FlyClientIp, "Fly-Client-IP");
-    impl_single_header!(TrueClientIp, "True-Client-IP");
-    impl_single_header!(CfConnectingIp, "CF-Connecting-IP");
+    impl_single_header!(XRealIp, "x-real-ip");
+    impl_single_header!(FlyClientIp, "fly-client-ip");
+    impl_single_header!(TrueClientIp, "true-client-ip");
+    impl_single_header!(CfConnectingIp, "cf-connecting-ip");
 
     impl SingleIpHeader for CloudFrontViewerAddress {
-        const HEADER: &'static str = "cloudfront-viewer-address";
+        const HEADER: HeaderName = HeaderName::from_static("cloudfront-viewer-address");
 
         fn maybe_ip_from_headers(headers: &HeaderMap) -> Option<IpAddr> {
             headers
@@ -212,7 +212,7 @@ mod basic {
     }
 
     impl MultiIpHeader for XForwardedFor {
-        const HEADER: &'static str = "X-Forwarded-For";
+        const HEADER: HeaderName = HeaderName::from_static("x-forwarded-for");
 
         fn ips_from_header_value(header_value: &str) -> Vec<IpAddr> {
             header_value
@@ -223,7 +223,7 @@ mod basic {
     }
 
     impl MultiIpHeader for Forwarded {
-        const HEADER: &'static str = "Forwarded";
+        const HEADER: HeaderName = HeaderName::from_static("forwarded");
 
         fn ips_from_header_value(header_value: &str) -> Vec<IpAddr> {
             use forwarded_header_value::{ForwardedHeaderValue, Identifier};
