@@ -861,7 +861,7 @@ mod insecure {
                 .map(Self)
                 .ok_or((
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    "Can't extract `UnsecureClientIp`, provide `axum::extract::ConnectInfo`",
+                    "Can't extract `InsecureClientIp`, provide `axum::extract::ConnectInfo`",
                 ))
         }
     }
