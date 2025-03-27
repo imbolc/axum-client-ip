@@ -5,7 +5,7 @@ use std::{
 
 use axum::{
     extract::{ConnectInfo, FromRequestParts},
-    http::{request::Parts, Extensions, HeaderMap, HeaderValue, StatusCode},
+    http::{Extensions, HeaderMap, HeaderValue, StatusCode, request::Parts},
 };
 
 use crate::rudimental::{
@@ -83,7 +83,7 @@ fn maybe_connect_info(extensions: &Extensions) -> Option<IpAddr> {
 
 #[cfg(test)]
 mod tests {
-    use axum::{body::Body, http::Request, routing::get, Router};
+    use axum::{Router, body::Body, http::Request, routing::get};
     use http_body_util::BodyExt;
     use tower::ServiceExt;
 

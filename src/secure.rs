@@ -8,7 +8,7 @@ use std::{
 
 use axum::{
     extract::{ConnectInfo, Extension, FromRequestParts},
-    http::{request::Parts, Extensions, HeaderMap, HeaderValue},
+    http::{Extensions, HeaderMap, HeaderValue, request::Parts},
 };
 use serde::{Deserialize, Serialize};
 
@@ -129,10 +129,11 @@ where
     type Rejection = StringRejection;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        if let Some(ip_source) = parts.extensions.get() {
-            Ok(Self::from(ip_source, &parts.headers, &parts.extensions)?)
-        } else {
-            Err("Can't extract `SecureClientIp`, add `SecureClientIpSource` into extensions".into())
+        match parts.extensions.get() {
+            Some(ip_source) => Ok(Self::from(ip_source, &parts.headers, &parts.extensions)?),
+            _ => Err(
+                "Can't extract `SecureClientIp`, add `SecureClientIpSource` into extensions".into(),
+            ),
         }
     }
 }

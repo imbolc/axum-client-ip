@@ -1,6 +1,6 @@
 [package]
 description = "Client IP address extractors for Axum"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 name = "axum-client-ip"
 repository = "https://github.com/imbolc/axum-client-ip"

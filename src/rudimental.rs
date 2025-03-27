@@ -2,7 +2,7 @@ use std::net::IpAddr;
 
 use axum::{
     extract::FromRequestParts,
-    http::{request::Parts, HeaderMap},
+    http::{HeaderMap, request::Parts},
 };
 
 use crate::rejection::{InfallibleRejection, StringRejection};
@@ -304,10 +304,10 @@ where
 #[cfg(test)]
 mod tests {
     use axum::{
+        Router,
         body::Body,
         http::{Request, StatusCode},
         routing::get,
-        Router,
     };
     use http_body_util::BodyExt;
     use tower::ServiceExt;

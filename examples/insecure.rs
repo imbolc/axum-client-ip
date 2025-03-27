@@ -1,7 +1,7 @@
 //! Insecure IP extraction for arguably better IP determination
 use std::net::SocketAddr;
 
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 use axum_client_ip::InsecureClientIp;
 
 async fn handler(InsecureClientIp(ip): InsecureClientIp) -> String {

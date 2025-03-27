@@ -3,7 +3,7 @@
 //! cargo run --example secure`
 use std::net::SocketAddr;
 
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 use axum_client_ip::{SecureClientIp, SecureClientIpSource};
 
 #[derive(serde::Deserialize)]
