@@ -6,87 +6,49 @@
 
 Client IP address extractors for Axum
 
-## Why different extractors?
+## V1 breaking changes
 
-There are two distinct use cases for client IP which should be treated
-differently:
+- Removed `InsecureClientIp` and related "leftmost" IP logic. The library now focuses solely on secure extraction
+    based on trusted headers.
+- Renamed `SecureClientIp` to `ClientIp`.
+- Renamed `SecureClientIpSource` to `ClientIpSource`.
 
-1. You can't tolerate the possibility of spoofing (you're working on rate
-   limiting, spam protection, etc). In this case, you should use
-   [`SecureClientIp`] or an extractor for a particular header.
-2. You can trade potential spoofing for a statistically better IP
-   determination. E.g. you use the IP for geolocation when the correctness
-   of the location isn't critical for your app. For something like this, you
-   can use [`InsecureClientIp`].
+The changes are triggered by ["rightmost" IP extraction bug](https://github.com/imbolc/axum-client-ip/issues/32).
 
-For a deep dive into the trade-off refer to this Adam Pritchard's
-[article](https://adam-p.ca/blog/2022/03/x-forwarded-for/)
+## Configurable vs specific extractors
 
-## `SecureClientIp` vs specific header extractors
+There's a configurable [`ClientIp`] extractor you can use to make your application independent from
+a proxy it can run behind (if any) and also separate extractors for each proxy / source header.
 
-Apart from [`SecureClientIp`] there are concrete
-[`CfConnectingIp`],
-[`CloudFrontViewerAddress`],
-[`FlyClientIp`],
-[`Forwarded`],
-[`RightmostForwarded`],
-[`RightmostXForwardedFor`],
-[`TrueClientIp`],
-[`XForwardedFor`] and
-[`XRealIp`]
-secure extractors. You can use them directly if your code assumes a specific
-proxy configuration.
+| Extractor / `ClientIpSource` Variant | Header Used                   | Typical Proxy / Service                                  |
+| ------------------------------------ | ----------------------------- | -------------------------------------------------------- |
+| `CfConnectingIp`                     | `CF-Connecting-IP`            | Cloudflare                                               |
+| `CloudFrontViewerAddress`            | `CloudFront-Viewer-Address`   | AWS CloudFront                                           |
+| `FlyClientIp`                        | `Fly-Client-IP`               | Fly.io                                                   |
+| `RightmostForwarded`                 | `Forwarded`                   | Proxies supporting RFC 7239 (extracts rightmost `for=`)  |
+| `RightmostXForwardedFor`             | `X-Forwarded-For`             | Nginx, Apache, HAProxy, CDNs, LBs                        |
+| `TrueClientIp`                       | `True-Client-IP`              | Cloudflare, Akamai                                       |
+| `XRealIp`                            | `X-Real-Ip`                   | Nginx                                                    |
+| `ConnectInfo`                        | N/A (uses socket address)     | No proxy, e.g. listening directly to 80 port             |
 
-They work the same way - by extracting IP from the specified header you
-control. The only difference is in the target header specification. With
-`SecureClientIp` you can specify the header at runtime, so you can use e.g.
-environment variable for this setting (look at the implementation
-[example][secure-example]). While with specific extractors you'd need to
-recompile your code if you'd like to change the target header (e.g. you're
-moving to another cloud provider). To mitigate this change you can create a
-type alias e.g. `type InsecureIp = XRealIp` and use it in your handlers,
-then the change will affect only one line.
+## Configurable extractor
 
-## Usage
+The configurable extractor assumes initializing [`ClientIpSource`] at runtime (e.g. with an environment variable).
+This makes sense when you ship a pre-compiled binary, people meant to use in different environments.
+Here's an initialization [example].
+
+## Specific extractors
+
+Specific extractors don't require runtime initialization, but you'd have to recompile your binary when you change proxy server.
 
 ```rust,no_run
-use axum::{routing::get, Router};
-use axum_client_ip::{InsecureClientIp, SecureClientIp, SecureClientIpSource};
-use std::net::SocketAddr;
+// With the renaming, you have to change only one line when you change proxy
+use axum_client_ip::XRealIp as ClientIp;
 
-async fn handler(insecure_ip: InsecureClientIp, secure_ip: SecureClientIp) -> String {
-    format!("{insecure_ip:?} {secure_ip:?}")
-}
-
-#[tokio::main]
-async fn main() {
-    async fn handler(insecure_ip: InsecureClientIp, secure_ip: SecureClientIp) -> String {
-        format!("{insecure_ip:?} {secure_ip:?}")
-    }
-
-    let app = Router::new().route("/", get(handler))
-        .layer(SecureClientIpSource::ConnectInfo.into_extension());
-
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    axum::serve(
-        listener,
-        // Don't forget to add `ConnectInfo` if you aren't behind a proxy
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .await
-    .unwrap()
+async fn handler(ClientIp(ip): ClientIp) {
+    todo!()
 }
 ```
-
-
-## A common issue with Axum extractors
-
-The most often issue with this extractor is using it after one consuming
-body e.g. [`axum::extract::Json`].
-To fix this rearrange extractors in your handler definition moving body
-consumption to the end, see [details][extractors-order].
-
 
 ## Contributing
 
@@ -95,8 +57,8 @@ consumption to the end, see [details][extractors-order].
 
 ## License
 
-This project is licensed under the [MIT license](LICENSE).
+This project is licensed under the [MIT license][license].
 
 [.pre-commit.sh]: https://github.com/imbolc/axum-client-ip/blob/main/pre-commit.sh
-[extractors-order]: https://docs.rs/axum/latest/axum/extract/index.html#the-order-of-extractors
-[secure-example]: https://github.com/imbolc/axum-client-ip/blob/main/examples/secure.rs
+[example]: https://github.com/imbolc/axum-client-ip/blob/main/examples/configurable.rs
+[license]: https://github.com/imbolc/axum-client-ip/blob/main/LICENSE

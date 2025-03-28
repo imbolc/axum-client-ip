@@ -1,17 +1,20 @@
-//! An example of configuring `SecureClientIp` using an env variable
-//! Don't forget set the variable before running e.g.: `IP_SOURCE=ConnectInfo
-//! cargo run --example secure`
+//! An example of configuring `ClientIp` using an environment variable
+//!
+//! Don't forget to set the variable before running, e.g.:
+//! ```sh
+//! IP_SOURCE=ConnectInfo cargo run --example configurable
+//! ```
 use std::net::SocketAddr;
 
 use axum::{Router, routing::get};
-use axum_client_ip::{SecureClientIp, SecureClientIpSource};
+use axum_client_ip::{ClientIp, ClientIpSource};
 
 #[derive(serde::Deserialize)]
 struct Config {
-    ip_source: SecureClientIpSource,
+    ip_source: ClientIpSource,
 }
 
-async fn handler(SecureClientIp(ip): SecureClientIp) -> String {
+async fn handler(ClientIp(ip): ClientIp) -> String {
     ip.to_string()
 }
 
@@ -21,7 +24,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(handler))
-        // the line you're probably looking for :)
+        // The line you're probably looking for :)
         .layer(config.ip_source.into_extension());
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -30,7 +33,7 @@ async fn main() {
     println!("Listening on http://localhost:3000/");
     axum::serve(
         listener,
-        // Don't forget to add `ConnectInfo`
+        // Required for `ClientIpSource::ConnectInfo`
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
     .await

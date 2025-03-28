@@ -4,17 +4,15 @@ edition = "2024"
 license = "MIT"
 name = "axum-client-ip"
 repository = "https://github.com/imbolc/axum-client-ip"
-version = "0.7.0"
+version = "1.0.0"
 
 [dependencies]
-axum = { version = "0.8", default-features = false, features = [
-  "http1",
-  "tokio",
-] }
+axum = { version = "0.8", default-features = false, features = ["tokio"] }
 forwarded-header-value = "0.1"
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
+axum = { version = "0.8", default-features = false, features = ["http1"] }
 envy = "0.4"
 http-body-util = "0.1"
 hyper = "1"
