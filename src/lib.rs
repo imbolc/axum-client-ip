@@ -42,7 +42,7 @@ trait IpExtractor {
         headers
             .get_all(Self::HEADER_NAME)
             .into_iter()
-            .last()
+            .next_back()
             .ok_or_else(|| Rejection::AbsentHeader {
                 header_name: Self::HEADER_NAME,
             })?
@@ -195,7 +195,7 @@ impl IpExtractor for RightmostXForwardedFor {
     fn ip_from_header_value(header_value: &str) -> Result<IpAddr, Rejection> {
         header_value
             .split(',')
-            .last()
+            .next_back()
             .ok_or_else(|| Rejection::MalformedHeaderValue {
                 header_name: Self::HEADER_NAME,
                 header_value: header_value.to_owned(),
