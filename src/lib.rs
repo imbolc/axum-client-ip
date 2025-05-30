@@ -9,65 +9,36 @@ use std::{
 
 use axum::{
     extract::{ConnectInfo, Extension, FromRequestParts},
-    http::{HeaderMap, HeaderName, StatusCode, request::Parts},
+    http::{HeaderName, StatusCode, request::Parts},
     response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
 
-/// An internal helper trait to extract an IP from headers
-trait IpExtractor {
-    const HEADER_NAME: HeaderName;
+/// Defines an extractor
+macro_rules! define_extractor {
+    (
+        $(#[$meta:meta])*
+        $newtype:ident,
+        $extractor:path
+    ) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, Copy)]
+        pub struct $newtype(pub std::net::IpAddr);
 
-    /// Extracts IP from decoded header value. Default implementation assumes
-    /// the header value is just a valid IP.
-    fn ip_from_header_value(header_value: &str) -> Result<IpAddr, Rejection> {
-        header_value
-            .trim()
-            .parse()
-            .map_err(|_| Rejection::MalformedHeaderValue {
-                header_name: Self::HEADER_NAME,
-                header_value: header_value.to_owned(),
-            })
-    }
-
-    /// Extracts an IP from headers.
-    fn ip_from_headers(headers: &HeaderMap) -> Result<IpAddr, Rejection> {
-        let header_value = Self::last_header_value(headers)?;
-        Self::ip_from_header_value(header_value)
-    }
-
-    /// Returns a decoded value of the last occurring header. Can also be used
-    /// for a header occurring only once.
-    fn last_header_value(headers: &HeaderMap) -> Result<&str, Rejection> {
-        headers
-            .get_all(Self::HEADER_NAME)
-            .into_iter()
-            .next_back()
-            .ok_or_else(|| Rejection::AbsentHeader {
-                header_name: Self::HEADER_NAME,
-            })?
-            .to_str()
-            .map_err(|_| Rejection::NonAsciiHeaderValue {
-                header_name: Self::HEADER_NAME,
-            })
-    }
-}
-
-/// Implements default [`IpExtractor`]
-macro_rules! impl_default_ip_extractor {
-    ($type:ty, $header:literal) => {
-        impl IpExtractor for $type {
-            const HEADER_NAME: HeaderName = HeaderName::from_static($header);
+        impl $newtype {
+            fn ip_from_headers(headers: &axum::http::HeaderMap) -> Result<std::net::IpAddr, Rejection> {
+                Ok($extractor(&headers)?)
+            }
         }
 
-        impl<S> FromRequestParts<S> for $type
+        impl<S> axum::extract::FromRequestParts<S> for $newtype
         where
             S: Sync,
         {
-            type Rejection = Rejection;
+            type Rejection = Rejection; // Replace with your actual Rejection type if different
 
             async fn from_request_parts(
-                parts: &mut Parts,
+                parts: &mut axum::http::request::Parts, // Or your specific Parts type
                 _state: &S,
             ) -> Result<Self, Self::Rejection> {
                 Self::ip_from_headers(&parts.headers).map(Self)
@@ -76,161 +47,52 @@ macro_rules! impl_default_ip_extractor {
     };
 }
 
-/// Extracts an IP from `CF-Connecting-IP` (Cloudflare) header
-#[derive(Debug, Clone, Copy)]
-pub struct CfConnectingIp(pub IpAddr);
+define_extractor!(
+    /// Extracts an IP from `CF-Connecting-IP` (Cloudflare) header
+    CfConnectingIp,
+    client_ip::cf_connecting_ip
+);
 
-impl_default_ip_extractor!(CfConnectingIp, "cf-connecting-ip");
+define_extractor!(
+    /// Extracts an IP from `CloudFront-Viewer-Address` (AWS CloudFront) header
+    CloudFrontViewerAddress,
+    client_ip::cloudfront_viewer_address
+);
 
-/// Extracts an IP from `CloudFront-Viewer-Address` (AWS CloudFront) header
-#[derive(Debug, Clone, Copy)]
-pub struct CloudFrontViewerAddress(pub IpAddr);
+define_extractor!(
+    /// Extracts an IP from `Fly-Client-IP` (Fly.io) header
+    ///
+    /// When [`FlyClientIp`] extractor is run for health check path,
+    /// provide required `Fly-Client-IP` header through
+    /// [`services.http_checks.headers`](https://fly.io/docs/reference/configuration/#services-http_checks)
+    /// or [`http_service.checks.headers`](https://fly.io/docs/reference/configuration/#services-http_checks)
+    FlyClientIp,
+    client_ip::fly_client_ip
+);
 
-impl IpExtractor for CloudFrontViewerAddress {
-    const HEADER_NAME: HeaderName = HeaderName::from_static("cloudfront-viewer-address");
+define_extractor!(
+    /// Extracts the rightmost IP from `Forwarded` header
+    RightmostForwarded,
+    client_ip::rightmost_forwarded
+);
 
-    fn ip_from_header_value(header_value: &str) -> Result<IpAddr, Rejection> {
-        // Spec: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/adding-cloudfront-headers.html#cloudfront-headers-viewer-location
-        // Note: Both IPv4 and IPv6 addresses (in the specified format) do not contain
-        //       non-ascii characters, so no need to handle percent-encoding.
-        //
-        // CloudFront does not use `[::]:12345` style notation for IPv6 (unfortunately),
-        // otherwise parsing via `SocketAddr` would be possible.
-        header_value
-            .rsplit_once(':')
-            .map(|(ip, _port)| ip)
-            .ok_or_else(|| Rejection::MalformedHeaderValue {
-                header_name: Self::HEADER_NAME,
-                header_value: header_value.to_owned(),
-            })?
-            .parse::<IpAddr>()
-            .map_err(|_| Rejection::MalformedHeaderValue {
-                header_name: Self::HEADER_NAME,
-                header_value: header_value.to_owned(),
-            })
-    }
-}
+define_extractor!(
+    /// Extracts the rightmost IP from `X-Forwarded-For` header
+    RightmostXForwardedFor,
+    client_ip::rightmost_x_forwarded_for
+);
 
-impl<S> FromRequestParts<S> for CloudFrontViewerAddress
-where
-    S: Sync,
-{
-    type Rejection = Rejection;
+define_extractor!(
+    /// Extracts an IP from `True-Client-IP` (Akamai, Cloudflare) header
+    TrueClientIp,
+    client_ip::true_client_ip
+);
 
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        Self::ip_from_headers(&parts.headers).map(Self)
-    }
-}
-
-/// Extracts an IP from `Fly-Client-IP` (Fly.io) header
-///
-/// When [`FlyClientIp`] extractor is run for health check path,
-/// provide required `Fly-Client-IP` header through
-/// [`services.http_checks.headers`](https://fly.io/docs/reference/configuration/#services-http_checks)
-/// or [`http_service.checks.headers`](https://fly.io/docs/reference/configuration/#services-http_checks)
-#[derive(Debug, Clone, Copy)]
-pub struct FlyClientIp(pub IpAddr);
-
-impl_default_ip_extractor!(FlyClientIp, "fly-client-ip");
-
-/// Extracts the rightmost IP from `Forwarded` header
-#[derive(Debug, Clone, Copy)]
-pub struct RightmostForwarded(pub IpAddr);
-
-impl IpExtractor for RightmostForwarded {
-    const HEADER_NAME: HeaderName = HeaderName::from_static("forwarded");
-
-    fn ip_from_header_value(header_value: &str) -> Result<IpAddr, Rejection> {
-        use forwarded_header_value::{ForwardedHeaderValue, Identifier};
-
-        let stanza = ForwardedHeaderValue::from_forwarded(header_value)
-            .map_err(|_| Rejection::MalformedHeaderValue {
-                header_name: Self::HEADER_NAME,
-                header_value: header_value.to_owned(),
-            })?
-            .into_iter()
-            .last()
-            .ok_or_else(|| Rejection::MalformedHeaderValue {
-                header_name: Self::HEADER_NAME,
-                header_value: header_value.to_owned(),
-            })?;
-
-        let forwarded_for = stanza
-            .forwarded_for
-            .ok_or_else(|| Rejection::ForwardedNoFor {
-                header_value: header_value.to_owned(),
-            })?;
-
-        match forwarded_for {
-            Identifier::SocketAddr(a) => Ok(a.ip()),
-            Identifier::IpAddr(ip) => Ok(ip),
-            Identifier::String(_) => Err(Rejection::ForwardedObfuscated {
-                header_value: header_value.to_owned(),
-            }),
-            Identifier::Unknown => Err(Rejection::ForwardedUnknown {
-                header_value: header_value.to_owned(),
-            }),
-        }
-    }
-}
-
-impl<S> FromRequestParts<S> for RightmostForwarded
-where
-    S: Sync,
-{
-    type Rejection = Rejection;
-
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        Self::ip_from_headers(&parts.headers).map(Self)
-    }
-}
-
-/// Extracts the rightmost IP from `X-Forwarded-For` header
-#[derive(Debug, Clone, Copy)]
-pub struct RightmostXForwardedFor(pub IpAddr);
-
-impl IpExtractor for RightmostXForwardedFor {
-    const HEADER_NAME: HeaderName = HeaderName::from_static("x-forwarded-for");
-
-    fn ip_from_header_value(header_value: &str) -> Result<IpAddr, Rejection> {
-        header_value
-            .split(',')
-            .next_back()
-            .ok_or_else(|| Rejection::MalformedHeaderValue {
-                header_name: Self::HEADER_NAME,
-                header_value: header_value.to_owned(),
-            })?
-            .trim()
-            .parse::<IpAddr>()
-            .map_err(|_| Rejection::MalformedHeaderValue {
-                header_name: Self::HEADER_NAME,
-                header_value: header_value.to_owned(),
-            })
-    }
-}
-
-impl<S> FromRequestParts<S> for RightmostXForwardedFor
-where
-    S: Sync,
-{
-    type Rejection = Rejection;
-
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        Self::ip_from_headers(&parts.headers).map(Self)
-    }
-}
-
-/// Extracts an IP from `True-Client-IP` (Akamai, Cloudflare) header
-#[derive(Debug, Clone, Copy)]
-pub struct TrueClientIp(pub IpAddr);
-
-impl_default_ip_extractor!(TrueClientIp, "true-client-ip");
-
-/// Extracts an IP from `X-Real-Ip` (Nginx) header
-#[derive(Debug, Clone, Copy)]
-pub struct XRealIp(pub IpAddr);
-
-impl_default_ip_extractor!(XRealIp, "x-real-ip");
+define_extractor!(
+    /// Extracts an IP from `X-Real-Ip` (Nginx) header
+    XRealIp,
+    client_ip::x_real_ip
+);
 
 /// Client IP extractor with configurable source
 ///
@@ -379,6 +241,35 @@ pub enum Rejection {
     },
 }
 
+impl From<client_ip::Error> for Rejection {
+    fn from(value: client_ip::Error) -> Self {
+        match value {
+            client_ip::Error::AbsentHeader { header_name } => {
+                Rejection::AbsentHeader { header_name }
+            }
+            client_ip::Error::NonAsciiHeaderValue { header_name } => {
+                Rejection::NonAsciiHeaderValue { header_name }
+            }
+            client_ip::Error::MalformedHeaderValue {
+                header_name,
+                header_value,
+            } => Rejection::MalformedHeaderValue {
+                header_name,
+                header_value,
+            },
+            client_ip::Error::ForwardedNoFor { header_value } => {
+                Rejection::ForwardedNoFor { header_value }
+            }
+            client_ip::Error::ForwardedObfuscated { header_value } => {
+                Rejection::ForwardedObfuscated { header_value }
+            }
+            client_ip::Error::ForwardedUnknown { header_value } => {
+                Rejection::ForwardedUnknown { header_value }
+            }
+        }
+    }
+}
+
 impl fmt::Display for Rejection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -467,7 +358,7 @@ mod tests {
         CfConnectingIp, FlyClientIp, RightmostForwarded, RightmostXForwardedFor, TrueClientIp,
         XRealIp,
     };
-    use crate::{CloudFrontViewerAddress, IpExtractor, Rejection};
+    use crate::{CloudFrontViewerAddress, Rejection};
 
     const VALID_IPV4: &str = "1.2.3.4";
     const VALID_IPV6: &str = "1:23:4567:89ab:c:d:e:f";

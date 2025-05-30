@@ -8,7 +8,9 @@ version = "1.0.0"
 
 [dependencies]
 axum = { version = "0.8", default-features = false, features = ["tokio"] }
-forwarded-header-value = "0.1"
+client-ip = { git = "ssh://git@github.com/imbolc/client-ip.git", features = [
+  "forwarded-header",
+] }
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
