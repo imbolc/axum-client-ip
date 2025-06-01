@@ -35,10 +35,10 @@ macro_rules! define_extractor {
         where
             S: Sync,
         {
-            type Rejection = Rejection; // Replace with your actual Rejection type if different
+            type Rejection = Rejection;
 
             async fn from_request_parts(
-                parts: &mut axum::http::request::Parts, // Or your specific Parts type
+                parts: &mut axum::http::request::Parts,
                 _state: &S,
             ) -> Result<Self, Self::Rejection> {
                 Self::ip_from_headers(&parts.headers).map(Self)
