@@ -4,7 +4,8 @@
 [![Crates.io](https://img.shields.io/crates/v/axum-client-ip.svg)](https://crates.io/crates/axum-client-ip)
 [![Docs.rs](https://docs.rs/axum-client-ip/badge.svg)](https://docs.rs/axum-client-ip)
 
-Client IP address extractors for Axum
+Client IP address extractors for the [Axum] web framework. The crate is just a
+thin wrapper around a framework-independent [client-ip] crate.
 
 ## V1 breaking changes
 
@@ -63,7 +64,9 @@ async fn handler(ClientIp(ip): ClientIp) {
 This project is licensed under the [MIT license][license].
 
 [.pre-commit.sh]:
-    https://github.com/imbolc/axum-client-ip/blob/main/pre-commit.sh
+    https://github.com/imbolc/axum-client-ip/blob/main/.pre-commit.sh
+[Axum]: https://github.com/tokio-rs/axum
+[client-ip]: https://github.com/imbolc/client-ip
 [example]:
     https://github.com/imbolc/axum-client-ip/blob/main/examples/configurable.rs
 [license]: https://github.com/imbolc/axum-client-ip/blob/main/LICENSE

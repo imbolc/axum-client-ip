@@ -11,25 +11,25 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
 
             - name: Nightly Rust
-              uses: actions-rs/toolchain@v1
+              uses: dtolnay/rust-toolchain@master
               with:
                   toolchain: nightly
                   components: rustfmt
 
             - name: Rustfmt
-              run: cargo fmt -- --check
+              run: cargo +nightly fmt -- --check
 
     clippy:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
 
             - name: Stable Rust
-              uses: actions-rs/toolchain@v1
+              uses: dtolnay/rust-toolchain@master
               with:
                   toolchain: stable
                   components: clippy
@@ -37,19 +37,36 @@ jobs:
             - name: Clippy
               run: cargo clippy --all-targets --all-features -- -D warnings
 
+    rustdoc:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Stable Rust
+              uses: dtolnay/rust-toolchain@master
+              with:
+                  toolchain: stable
+
+            - name: Rustdoc
+              run: cargo rustdoc --all-features -- -D warnings
+
     test:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
 
             - name: Stable Rust
-              uses: actions-rs/toolchain@v1
+              uses: dtolnay/rust-toolchain@master
               with:
                   toolchain: stable
 
-            - name: Test all targets
-              run: cargo test --all-targets --all-features
+            - name: Test default features
+              run: cargo test --all-targets
+
+            - name: Test forwarded-header feature
+              run: cargo test --all-targets --features forwarded-header
 
             - name: Test docs
               run: cargo test --doc
@@ -58,7 +75,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
 
             - name: Check typos
               uses: crate-ci/typos@master
@@ -69,10 +86,10 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
 
             - name: Stable Rust
-              uses: actions-rs/toolchain@v1
+              uses: dtolnay/rust-toolchain@master
               with:
                   toolchain: stable
 
@@ -86,10 +103,10 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
 
             - name: Stable Rust
-              uses: actions-rs/toolchain@v1
+              uses: dtolnay/rust-toolchain@master
               with:
                   toolchain: stable
 
