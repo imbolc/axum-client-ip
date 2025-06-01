@@ -6,12 +6,15 @@ name = "axum-client-ip"
 repository = "https://github.com/imbolc/axum-client-ip"
 version = "1.0.0"
 
+[features]
+default = ["serde"]
+forwarded-header = ["client-ip/forwarded-header"]
+serde = ["dep:serde"]
+
 [dependencies]
 axum = { version = "0.8", default-features = false, features = ["tokio"] }
-client-ip = { git = "ssh://git@github.com/imbolc/client-ip.git", features = [
-  "forwarded-header",
-] }
-serde = { version = "1", features = ["derive"] }
+client-ip = { git = "ssh://git@github.com/imbolc/client-ip.git" }
+serde = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
 axum = { version = "0.8", default-features = false, features = ["http1"] }

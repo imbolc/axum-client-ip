@@ -70,6 +70,7 @@ define_extractor!(
     client_ip::fly_client_ip
 );
 
+#[cfg(feature = "forwarded-header")]
 define_extractor!(
     /// Extracts the rightmost IP from `Forwarded` header
     RightmostForwarded,
@@ -107,6 +108,7 @@ define_extractor!(
 pub struct ClientIp(pub IpAddr);
 
 /// [`ClientIp`] source configuration
+#[non_exhaustive]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum ClientIpSource {
     /// IP from the `CF-Connecting-IP` header
@@ -117,6 +119,7 @@ pub enum ClientIpSource {
     ConnectInfo,
     /// IP from the `Fly-Client-IP` header
     FlyClientIp,
+    #[cfg(feature = "forwarded-header")]
     /// Rightmost IP from the `Forwarded` header
     RightmostForwarded,
     /// Rightmost IP from the `X-Forwarded-For` header
@@ -152,14 +155,15 @@ impl FromStr for ClientIpSource {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
+            "CfConnectingIp" => Self::CfConnectingIp,
+            "CloudFrontViewerAddress" => Self::CloudFrontViewerAddress,
+            "ConnectInfo" => Self::ConnectInfo,
+            "FlyClientIp" => Self::FlyClientIp,
+            #[cfg(feature = "forwarded-header")]
             "RightmostForwarded" => Self::RightmostForwarded,
             "RightmostXForwardedFor" => Self::RightmostXForwardedFor,
-            "XRealIp" => Self::XRealIp,
-            "FlyClientIp" => Self::FlyClientIp,
             "TrueClientIp" => Self::TrueClientIp,
-            "CfConnectingIp" => Self::CfConnectingIp,
-            "ConnectInfo" => Self::ConnectInfo,
-            "CloudFrontViewerAddress" => Self::CloudFrontViewerAddress,
+            "XRealIp" => Self::XRealIp,
             _ => return Err(ParseClientIpSourceError(s.to_string())),
         })
     }
@@ -187,6 +191,7 @@ where
                 .map(|ConnectInfo(addr)| addr.ip())
                 .ok_or_else(|| Rejection::NoConnectInfo),
             ClientIpSource::FlyClientIp => FlyClientIp::ip_from_headers(&parts.headers),
+            #[cfg(feature = "forwarded-header")]
             ClientIpSource::RightmostForwarded => {
                 RightmostForwarded::ip_from_headers(&parts.headers)
             }
@@ -201,6 +206,7 @@ where
 }
 
 /// Rejection type for IP extractors
+#[non_exhaustive]
 #[derive(Debug, PartialEq)]
 pub enum Rejection {
     /// No [`axum::extract::ConnectInfo`] in extensions
@@ -223,6 +229,16 @@ pub enum Rejection {
         header_name: HeaderName,
         /// Header value
         header_value: String,
+    },
+    /// Multiple occurrences of a header required to occur only once found
+    ///
+    /// According to the HTTP/1.1 specification (RFC 7230, Section 3.2.2):
+    /// > A sender MUST NOT generate multiple header fields with the same
+    /// > field name in a message unless either the entire field value for
+    /// > that header field is defined as a comma-separated list ...
+    SingleHeaderRequired {
+        /// Header name
+        header_name: HeaderName,
     },
     /// Forwarded header doesn't contain `for` directive
     ForwardedNoFor {
@@ -257,12 +273,18 @@ impl From<client_ip::Error> for Rejection {
                 header_name,
                 header_value,
             },
+            client_ip::Error::SingleHeaderRequired { header_name } => {
+                Rejection::SingleHeaderRequired { header_name }
+            }
+            #[cfg(feature = "forwarded-header")]
             client_ip::Error::ForwardedNoFor { header_value } => {
                 Rejection::ForwardedNoFor { header_value }
             }
+            #[cfg(feature = "forwarded-header")]
             client_ip::Error::ForwardedObfuscated { header_value } => {
                 Rejection::ForwardedObfuscated { header_value }
             }
+            #[cfg(feature = "forwarded-header")]
             client_ip::Error::ForwardedUnknown { header_value } => {
                 Rejection::ForwardedUnknown { header_value }
             }
@@ -283,6 +305,10 @@ impl fmt::Display for Rejection {
             Rejection::AbsentHeader { header_name } => {
                 write!(f, "Missing required header: {header_name}")
             }
+            Rejection::SingleHeaderRequired { header_name } => write!(
+                f,
+                "Multiple occurrences of the header aren't allowed: {header_name}"
+            ),
             Rejection::NonAsciiHeaderValue { header_name } => write!(
                 f,
                 "Header value contains non-ASCII characters: {header_name}",
@@ -330,6 +356,7 @@ impl IntoResponse for Rejection {
             Self::AbsentHeader { .. } => proxy_issue,
             Self::NonAsciiHeaderValue { .. } => proxy_issue,
             Self::MalformedHeaderValue { .. } => proxy_issue,
+            Self::SingleHeaderRequired { .. } => proxy_issue,
             Self::ForwardedNoFor { .. } => proxy_issue,
             Self::ForwardedObfuscated { .. } => proxy_issue,
             Self::ForwardedUnknown { .. } => request_issue,
@@ -343,22 +370,19 @@ impl IntoResponse for Rejection {
 
 #[cfg(test)]
 mod tests {
-    use std::net::IpAddr;
-
     use axum::{
         Router,
         body::Body,
-        http::{HeaderMap, HeaderName, Request, StatusCode},
+        http::{Request, StatusCode},
         routing::get,
     };
     use http_body_util::BodyExt;
     use tower::ServiceExt;
 
-    use super::{
-        CfConnectingIp, FlyClientIp, RightmostForwarded, RightmostXForwardedFor, TrueClientIp,
-        XRealIp,
-    };
-    use crate::{CloudFrontViewerAddress, Rejection};
+    #[cfg(feature = "forwarded-header")]
+    use super::RightmostForwarded;
+    use super::{CfConnectingIp, FlyClientIp, RightmostXForwardedFor, TrueClientIp, XRealIp};
+    use crate::CloudFrontViewerAddress;
 
     const VALID_IPV4: &str = "1.2.3.4";
     const VALID_IPV6: &str = "1:23:4567:89ab:c:d:e:f";
@@ -368,46 +392,9 @@ mod tests {
         String::from_utf8_lossy(&bytes).into()
     }
 
-    fn headers<'a>(items: impl IntoIterator<Item = (&'a str, &'a str)>) -> HeaderMap {
-        HeaderMap::from_iter(
-            items
-                .into_iter()
-                .map(|(name, value)| (name.parse().unwrap(), value.parse().unwrap())),
-        )
-    }
-
     #[tokio::test]
     async fn cf_connecting_ip() {
         let header = "cf-connecting-ip";
-
-        assert_eq!(
-            CfConnectingIp::ip_from_headers(&headers([])).unwrap_err(),
-            Rejection::AbsentHeader {
-                header_name: HeaderName::from_static(header)
-            }
-        );
-        assert_eq!(
-            CfConnectingIp::ip_from_headers(&headers([(header, "ы")])).unwrap_err(),
-            Rejection::NonAsciiHeaderValue {
-                header_name: HeaderName::from_static(header)
-            }
-        );
-        assert_eq!(
-            CfConnectingIp::ip_from_headers(&headers([(header, "foo")])).unwrap_err(),
-            Rejection::MalformedHeaderValue {
-                header_name: HeaderName::from_static(header),
-                header_value: "foo".into(),
-            }
-        );
-
-        assert_eq!(
-            CfConnectingIp::ip_from_headers(&headers([(header, VALID_IPV4)])).unwrap(),
-            VALID_IPV4.parse::<IpAddr>().unwrap()
-        );
-        assert_eq!(
-            CfConnectingIp::ip_from_headers(&headers([(header, VALID_IPV6)])).unwrap(),
-            VALID_IPV6.parse::<IpAddr>().unwrap()
-        );
 
         fn app() -> Router {
             Router::new().route(
@@ -441,51 +428,8 @@ mod tests {
     async fn cloudfront_viewer_address() {
         let header = "cloudfront-viewer-address";
 
-        assert_eq!(
-            CloudFrontViewerAddress::ip_from_headers(&headers([])).unwrap_err(),
-            Rejection::AbsentHeader {
-                header_name: HeaderName::from_static(header)
-            }
-        );
-        assert_eq!(
-            CloudFrontViewerAddress::ip_from_headers(&headers([(header, "ы")])).unwrap_err(),
-            Rejection::NonAsciiHeaderValue {
-                header_name: HeaderName::from_static(header)
-            }
-        );
-        assert_eq!(
-            CloudFrontViewerAddress::ip_from_headers(&headers([(header, VALID_IPV4)])).unwrap_err(),
-            Rejection::MalformedHeaderValue {
-                header_name: HeaderName::from_static(header),
-                header_value: VALID_IPV4.into(),
-            }
-        );
-        assert_eq!(
-            CloudFrontViewerAddress::ip_from_headers(&headers([(header, "foo:8000")])).unwrap_err(),
-            Rejection::MalformedHeaderValue {
-                header_name: HeaderName::from_static(header),
-                header_value: "foo:8000".into(),
-            }
-        );
-
         let valid_header_value_v4 = format!("{VALID_IPV4}:8000");
         let valid_header_value_v6 = format!("{VALID_IPV6}:8000");
-        assert_eq!(
-            CloudFrontViewerAddress::ip_from_headers(&headers([(
-                header,
-                valid_header_value_v4.as_ref()
-            )]))
-            .unwrap(),
-            VALID_IPV4.parse::<IpAddr>().unwrap()
-        );
-        assert_eq!(
-            CloudFrontViewerAddress::ip_from_headers(&headers([(
-                header,
-                valid_header_value_v6.as_ref()
-            )]))
-            .unwrap(),
-            VALID_IPV6.parse::<IpAddr>().unwrap()
-        );
 
         fn app() -> Router {
             Router::new().route(
@@ -519,35 +463,6 @@ mod tests {
     async fn fly_client_ip() {
         let header = "fly-client-ip";
 
-        assert_eq!(
-            FlyClientIp::ip_from_headers(&headers([])).unwrap_err(),
-            Rejection::AbsentHeader {
-                header_name: HeaderName::from_static(header)
-            }
-        );
-        assert_eq!(
-            FlyClientIp::ip_from_headers(&headers([(header, "ы")])).unwrap_err(),
-            Rejection::NonAsciiHeaderValue {
-                header_name: HeaderName::from_static(header)
-            }
-        );
-        assert_eq!(
-            FlyClientIp::ip_from_headers(&headers([(header, "foo")])).unwrap_err(),
-            Rejection::MalformedHeaderValue {
-                header_name: HeaderName::from_static(header),
-                header_value: "foo".into(),
-            }
-        );
-
-        assert_eq!(
-            FlyClientIp::ip_from_headers(&headers([(header, VALID_IPV4)])).unwrap(),
-            VALID_IPV4.parse::<IpAddr>().unwrap()
-        );
-        assert_eq!(
-            FlyClientIp::ip_from_headers(&headers([(header, VALID_IPV6)])).unwrap(),
-            VALID_IPV6.parse::<IpAddr>().unwrap()
-        );
-
         fn app() -> Router {
             Router::new().route("/", get(|ip: FlyClientIp| async move { ip.0.to_string() }))
         }
@@ -573,85 +488,10 @@ mod tests {
         assert_eq!(body_to_string(resp.into_body()).await, VALID_IPV6);
     }
 
+    #[cfg(feature = "forwarded-header")]
     #[tokio::test]
     async fn rightmost_forwarded() {
         let header = "forwarded";
-
-        assert_eq!(
-            RightmostForwarded::ip_from_headers(&headers([])).unwrap_err(),
-            Rejection::AbsentHeader {
-                header_name: HeaderName::from_static(header)
-            }
-        );
-        assert_eq!(
-            RightmostForwarded::ip_from_headers(&headers([(header, "ы")])).unwrap_err(),
-            Rejection::NonAsciiHeaderValue {
-                header_name: HeaderName::from_static(header)
-            }
-        );
-        assert_eq!(
-            RightmostForwarded::ip_from_headers(&headers([(header, "foo")])).unwrap_err(),
-            Rejection::MalformedHeaderValue {
-                header_name: HeaderName::from_static(header),
-                header_value: "foo".into(),
-            }
-        );
-        assert_eq!(
-            RightmostForwarded::ip_from_headers(&headers([
-                (header, format!("for={VALID_IPV4}").as_ref()),
-                (header, "proto=http"),
-            ]))
-            .unwrap_err(),
-            Rejection::ForwardedNoFor {
-                header_value: "proto=http".into(),
-            }
-        );
-        assert_eq!(
-            RightmostForwarded::ip_from_headers(&headers([(header, "for=unknown")])).unwrap_err(),
-            Rejection::ForwardedUnknown {
-                header_value: "for=unknown".into(),
-            }
-        );
-        assert_eq!(
-            RightmostForwarded::ip_from_headers(&headers([(header, "for=_foo")])).unwrap_err(),
-            Rejection::ForwardedObfuscated {
-                header_value: "for=_foo".into(),
-            }
-        );
-
-        assert_eq!(
-            RightmostForwarded::ip_from_headers(&headers([
-                (header, "proto=http"),
-                (header, format!("for={VALID_IPV4};proto=http").as_ref()),
-            ]))
-            .unwrap(),
-            VALID_IPV4.parse::<IpAddr>().unwrap()
-        );
-        assert_eq!(
-            RightmostForwarded::ip_from_headers(&headers([(
-                header,
-                format!("for={VALID_IPV4}:8000").as_ref()
-            ),]))
-            .unwrap(),
-            VALID_IPV4.parse::<IpAddr>().unwrap()
-        );
-
-        assert_eq!(
-            RightmostForwarded::ip_from_headers(&headers([(
-                header,
-                format!("for={VALID_IPV6}").as_ref()
-            ),]))
-            .unwrap(),
-            VALID_IPV6.parse::<IpAddr>().unwrap()
-        );
-        assert_eq!(
-            RightmostForwarded::ip_from_headers(&headers([(
-                header,
-                format!("for=[{VALID_IPV6}]:8000").as_ref()
-            ),]))
-            .unwrap(),
-            VALID_IPV6.parse::<IpAddr>().unwrap()
-        );
 
         fn app() -> Router {
             Router::new().route(
@@ -685,42 +525,6 @@ mod tests {
 
     #[tokio::test]
     async fn rightmost_x_forwarded_for() {
-        let header = "x-forwarded-for";
-
-        assert_eq!(
-            RightmostXForwardedFor::ip_from_headers(&headers([])).unwrap_err(),
-            Rejection::AbsentHeader {
-                header_name: HeaderName::from_static(header)
-            }
-        );
-        assert_eq!(
-            RightmostXForwardedFor::ip_from_headers(&headers([(header, "ы")])).unwrap_err(),
-            Rejection::NonAsciiHeaderValue {
-                header_name: HeaderName::from_static(header)
-            }
-        );
-        assert_eq!(
-            RightmostXForwardedFor::ip_from_headers(&headers([(header, "1.2.3.4,foo")]))
-                .unwrap_err(),
-            Rejection::MalformedHeaderValue {
-                header_name: HeaderName::from_static(header),
-                header_value: "1.2.3.4,foo".into(),
-            }
-        );
-
-        assert_eq!(
-            RightmostXForwardedFor::ip_from_headers(&headers([(
-                header,
-                format!("foo,{VALID_IPV4}").as_ref()
-            )]))
-            .unwrap(),
-            VALID_IPV4.parse::<IpAddr>().unwrap()
-        );
-        assert_eq!(
-            RightmostXForwardedFor::ip_from_headers(&headers([(header, VALID_IPV6)])).unwrap(),
-            VALID_IPV6.parse::<IpAddr>().unwrap()
-        );
-
         fn app() -> Router {
             Router::new().route(
                 "/",
@@ -750,35 +554,6 @@ mod tests {
     async fn true_client_ip() {
         let header = "true-client-ip";
 
-        assert_eq!(
-            TrueClientIp::ip_from_headers(&headers([])).unwrap_err(),
-            Rejection::AbsentHeader {
-                header_name: HeaderName::from_static(header)
-            }
-        );
-        assert_eq!(
-            TrueClientIp::ip_from_headers(&headers([(header, "ы")])).unwrap_err(),
-            Rejection::NonAsciiHeaderValue {
-                header_name: HeaderName::from_static(header)
-            }
-        );
-        assert_eq!(
-            TrueClientIp::ip_from_headers(&headers([(header, "foo")])).unwrap_err(),
-            Rejection::MalformedHeaderValue {
-                header_name: HeaderName::from_static(header),
-                header_value: "foo".into(),
-            }
-        );
-
-        assert_eq!(
-            TrueClientIp::ip_from_headers(&headers([(header, VALID_IPV4)])).unwrap(),
-            VALID_IPV4.parse::<IpAddr>().unwrap()
-        );
-        assert_eq!(
-            TrueClientIp::ip_from_headers(&headers([(header, VALID_IPV6)])).unwrap(),
-            VALID_IPV6.parse::<IpAddr>().unwrap()
-        );
-
         fn app() -> Router {
             Router::new().route("/", get(|ip: TrueClientIp| async move { ip.0.to_string() }))
         }
@@ -807,35 +582,6 @@ mod tests {
     #[tokio::test]
     async fn x_real_ip() {
         let header = "x-real-ip";
-
-        assert_eq!(
-            XRealIp::ip_from_headers(&headers([])).unwrap_err(),
-            Rejection::AbsentHeader {
-                header_name: HeaderName::from_static(header)
-            }
-        );
-        assert_eq!(
-            XRealIp::ip_from_headers(&headers([(header, "ы")])).unwrap_err(),
-            Rejection::NonAsciiHeaderValue {
-                header_name: HeaderName::from_static(header)
-            }
-        );
-        assert_eq!(
-            XRealIp::ip_from_headers(&headers([(header, "foo")])).unwrap_err(),
-            Rejection::MalformedHeaderValue {
-                header_name: HeaderName::from_static(header),
-                header_value: "foo".into(),
-            }
-        );
-
-        assert_eq!(
-            XRealIp::ip_from_headers(&headers([(header, VALID_IPV4)])).unwrap(),
-            VALID_IPV4.parse::<IpAddr>().unwrap()
-        );
-        assert_eq!(
-            XRealIp::ip_from_headers(&headers([(header, VALID_IPV6)])).unwrap(),
-            VALID_IPV6.parse::<IpAddr>().unwrap()
-        );
 
         fn app() -> Router {
             Router::new().route("/", get(|ip: XRealIp| async move { ip.0.to_string() }))

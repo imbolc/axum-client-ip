@@ -63,7 +63,7 @@ async fn handler(ClientIp(ip): ClientIp) {
 This project is licensed under the [MIT license][license].
 
 [.pre-commit.sh]:
-    https://github.com/imbolc/axum-client-ip/blob/main/pre-commit.sh
+    https://github.com/imbolc/axum-client-ip/blob/main/.pre-commit.sh
 [example]:
     https://github.com/imbolc/axum-client-ip/blob/main/examples/configurable.rs
 [license]: https://github.com/imbolc/axum-client-ip/blob/main/LICENSE
