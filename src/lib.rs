@@ -9,7 +9,7 @@ use std::{
 
 use axum::{
     extract::{ConnectInfo, Extension, FromRequestParts},
-    http::{HeaderName, StatusCode, request::Parts},
+    http::{StatusCode, request::Parts},
     response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
@@ -213,82 +213,13 @@ pub enum Rejection {
     NoConnectInfo,
     /// No [`ClientIpSource`] in extensions
     NoClientIpSource,
-    /// The IP-related header is missing
-    AbsentHeader {
-        /// Header name
-        header_name: HeaderName,
-    },
-    /// Header value contains not only visible ASCII characters
-    NonAsciiHeaderValue {
-        /// Header name
-        header_name: HeaderName,
-    },
-    /// Header value has an unexpected format
-    MalformedHeaderValue {
-        /// Header name
-        header_name: HeaderName,
-        /// Header value
-        header_value: String,
-    },
-    /// Multiple occurrences of a header required to occur only once found
-    ///
-    /// According to the HTTP/1.1 specification (RFC 7230, Section 3.2.2):
-    /// > A sender MUST NOT generate multiple header fields with the same
-    /// > field name in a message unless either the entire field value for
-    /// > that header field is defined as a comma-separated list ...
-    SingleHeaderRequired {
-        /// Header name
-        header_name: HeaderName,
-    },
-    /// Forwarded header doesn't contain `for` directive
-    ForwardedNoFor {
-        /// Header value
-        header_value: String,
-    },
-    /// RFC 7239 allows to [obfuscate IPs](https://www.rfc-editor.org/rfc/rfc7239.html#section-6.3)
-    ForwardedObfuscated {
-        /// Header value
-        header_value: String,
-    },
-    /// RFC 7239 allows [unknown identifiers](https://www.rfc-editor.org/rfc/rfc7239.html#section-6.2)
-    ForwardedUnknown {
-        /// Header value
-        header_value: String,
-    },
+    /// [`client-ip`] error
+    ClientIp(client_ip::Error),
 }
 
 impl From<client_ip::Error> for Rejection {
     fn from(value: client_ip::Error) -> Self {
-        match value {
-            client_ip::Error::AbsentHeader { header_name } => {
-                Rejection::AbsentHeader { header_name }
-            }
-            client_ip::Error::NonAsciiHeaderValue { header_name } => {
-                Rejection::NonAsciiHeaderValue { header_name }
-            }
-            client_ip::Error::MalformedHeaderValue {
-                header_name,
-                header_value,
-            } => Rejection::MalformedHeaderValue {
-                header_name,
-                header_value,
-            },
-            client_ip::Error::SingleHeaderRequired { header_name } => {
-                Rejection::SingleHeaderRequired { header_name }
-            }
-            #[cfg(feature = "forwarded-header")]
-            client_ip::Error::ForwardedNoFor { header_value } => {
-                Rejection::ForwardedNoFor { header_value }
-            }
-            #[cfg(feature = "forwarded-header")]
-            client_ip::Error::ForwardedObfuscated { header_value } => {
-                Rejection::ForwardedObfuscated { header_value }
-            }
-            #[cfg(feature = "forwarded-header")]
-            client_ip::Error::ForwardedUnknown { header_value } => {
-                Rejection::ForwardedUnknown { header_value }
-            }
-        }
+        Self::ClientIp(value)
     }
 }
 
@@ -302,36 +233,7 @@ impl fmt::Display for Rejection {
                 f,
                 "Add `axum_client_ip::ClientIpSource` to request extensions"
             ),
-            Rejection::AbsentHeader { header_name } => {
-                write!(f, "Missing required header: {header_name}")
-            }
-            Rejection::SingleHeaderRequired { header_name } => write!(
-                f,
-                "Multiple occurrences of the header aren't allowed: {header_name}"
-            ),
-            Rejection::NonAsciiHeaderValue { header_name } => write!(
-                f,
-                "Header value contains non-ASCII characters: {header_name}",
-            ),
-            Rejection::MalformedHeaderValue {
-                header_name,
-                header_value,
-            } => write!(
-                f,
-                "Malformed header value for `{header_name}`: {header_value}",
-            ),
-            Rejection::ForwardedNoFor { header_value } => write!(
-                f,
-                "`Forwarded` header missing `for` directive: {header_value}",
-            ),
-            Rejection::ForwardedObfuscated { header_value } => write!(
-                f,
-                "`Forwarded` header contains obfuscated IP: {header_value}",
-            ),
-            Rejection::ForwardedUnknown { header_value } => write!(
-                f,
-                "`Forwarded` header contains unknown identifier: {header_value}",
-            ),
+            Rejection::ClientIp(e) => write!(f, "{e}"),
         }
     }
 }
@@ -340,31 +242,13 @@ impl std::error::Error for Rejection {}
 
 impl IntoResponse for Rejection {
     fn into_response(self) -> Response {
-        let request_issue = (StatusCode::BAD_REQUEST, "400 Bad Request");
-        let proxy_issue = (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "500 Proxy Server Misconfiguration",
-        );
-        let axum_issue = (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "500 Axum Misconfiguration",
-        );
-
-        let (code, title) = match self {
-            Self::NoConnectInfo => axum_issue,
-            Self::NoClientIpSource => axum_issue,
-            Self::AbsentHeader { .. } => proxy_issue,
-            Self::NonAsciiHeaderValue { .. } => proxy_issue,
-            Self::MalformedHeaderValue { .. } => proxy_issue,
-            Self::SingleHeaderRequired { .. } => proxy_issue,
-            Self::ForwardedNoFor { .. } => proxy_issue,
-            Self::ForwardedObfuscated { .. } => proxy_issue,
-            Self::ForwardedUnknown { .. } => request_issue,
+        let title = match self {
+            Self::NoConnectInfo | Self::NoClientIpSource => "500 Axum Misconfiguration",
+            Self::ClientIp { .. } => "500 Proxy Server Misconfiguration",
         };
-
         let footer = "(the request is rejected by axum-client-ip)";
         let text = format!("{title}\n\n{self}\n\n{footer}");
-        (code, text).into_response()
+        (StatusCode::INTERNAL_SERVER_ERROR, text).into_response()
     }
 }
 
