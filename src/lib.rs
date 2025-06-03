@@ -13,7 +13,6 @@ use axum::{
     http::{StatusCode, request::Parts},
     response::{IntoResponse, Response},
 };
-use serde::{Deserialize, Serialize};
 
 /// Defines an extractor
 macro_rules! define_extractor {
@@ -110,7 +109,8 @@ pub struct ClientIp(pub IpAddr);
 
 /// [`ClientIp`] source configuration
 #[non_exhaustive]
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum ClientIpSource {
     /// IP from the `CF-Connecting-IP` header
     CfConnectingIp,

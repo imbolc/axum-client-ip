@@ -62,6 +62,9 @@ jobs:
               with:
                   toolchain: stable
 
+            - name: Test no default features
+              run: cargo test --lib --no-default-features
+
             - name: Test default features
               run: cargo test --all-targets
 
