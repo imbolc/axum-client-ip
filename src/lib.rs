@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![doc = include_str!("../README.md")]
 use std::{
     error::Error,
@@ -213,7 +214,7 @@ pub enum Rejection {
     NoConnectInfo,
     /// No [`ClientIpSource`] in extensions
     NoClientIpSource,
-    /// [`client-ip`] error
+    /// [`client_ip::Error`]
     ClientIp(client_ip::Error),
 }
 

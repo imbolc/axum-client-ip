@@ -4,7 +4,11 @@ edition = "2024"
 license = "MIT"
 name = "axum-client-ip"
 repository = "https://github.com/imbolc/axum-client-ip"
-version = "1.1.0"
+version = "1.1.2"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["serde"]
