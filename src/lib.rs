@@ -10,7 +10,7 @@ use std::{
 
 use axum::{
     extract::{ConnectInfo, Extension, FromRequestParts},
-    http::{StatusCode, request::Parts},
+    http::{Extensions, HeaderMap, StatusCode, request::Parts},
     response::{IntoResponse, Response},
 };
 
@@ -170,6 +170,35 @@ impl FromStr for ClientIpSource {
     }
 }
 
+impl ClientIp {
+    /// Extracts the client ip from the provided headers using the IP source defined in the extensions.
+    pub fn extract(extensions: &Extensions, headers: &HeaderMap) -> Result<Self, Rejection> {
+        let Some(ip_source) = extensions.get() else {
+            return Err(Rejection::NoClientIpSource);
+        };
+
+        match ip_source {
+            ClientIpSource::CfConnectingIp => CfConnectingIp::ip_from_headers(&headers),
+            ClientIpSource::CloudFrontViewerAddress => {
+                CloudFrontViewerAddress::ip_from_headers(&headers)
+            }
+            ClientIpSource::ConnectInfo => extensions
+                .get::<ConnectInfo<SocketAddr>>()
+                .map(|ConnectInfo(addr)| addr.ip())
+                .ok_or_else(|| Rejection::NoConnectInfo),
+            ClientIpSource::FlyClientIp => FlyClientIp::ip_from_headers(&headers),
+            #[cfg(feature = "forwarded-header")]
+            ClientIpSource::RightmostForwarded => RightmostForwarded::ip_from_headers(&headers),
+            ClientIpSource::RightmostXForwardedFor => {
+                RightmostXForwardedFor::ip_from_headers(&headers)
+            }
+            ClientIpSource::TrueClientIp => TrueClientIp::ip_from_headers(&headers),
+            ClientIpSource::XRealIp => XRealIp::ip_from_headers(&headers),
+        }
+        .map(Self)
+    }
+}
+
 impl<S> FromRequestParts<S> for ClientIp
 where
     S: Sync,
@@ -177,32 +206,7 @@ where
     type Rejection = Rejection;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        let Some(ip_source) = parts.extensions.get() else {
-            return Err(Rejection::NoClientIpSource);
-        };
-
-        match ip_source {
-            ClientIpSource::CfConnectingIp => CfConnectingIp::ip_from_headers(&parts.headers),
-            ClientIpSource::CloudFrontViewerAddress => {
-                CloudFrontViewerAddress::ip_from_headers(&parts.headers)
-            }
-            ClientIpSource::ConnectInfo => parts
-                .extensions
-                .get::<ConnectInfo<SocketAddr>>()
-                .map(|ConnectInfo(addr)| addr.ip())
-                .ok_or_else(|| Rejection::NoConnectInfo),
-            ClientIpSource::FlyClientIp => FlyClientIp::ip_from_headers(&parts.headers),
-            #[cfg(feature = "forwarded-header")]
-            ClientIpSource::RightmostForwarded => {
-                RightmostForwarded::ip_from_headers(&parts.headers)
-            }
-            ClientIpSource::RightmostXForwardedFor => {
-                RightmostXForwardedFor::ip_from_headers(&parts.headers)
-            }
-            ClientIpSource::TrueClientIp => TrueClientIp::ip_from_headers(&parts.headers),
-            ClientIpSource::XRealIp => XRealIp::ip_from_headers(&parts.headers),
-        }
-        .map(Self)
+        ClientIp::extract(&parts.extensions, &parts.headers)
     }
 }
 
