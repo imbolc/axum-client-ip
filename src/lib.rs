@@ -109,7 +109,7 @@ pub struct ClientIp(pub IpAddr);
 
 /// [`ClientIp`] source configuration
 #[non_exhaustive]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum ClientIpSource {
     /// IP from the `CF-Connecting-IP` header
@@ -166,6 +166,23 @@ impl FromStr for ClientIpSource {
             "TrueClientIp" => Self::TrueClientIp,
             "XRealIp" => Self::XRealIp,
             _ => return Err(ParseClientIpSourceError(s.to_string())),
+        })
+    }
+}
+
+// ensure to update tests::client_ip_source_display_impl_matches_from_str_impl
+impl fmt::Display for ClientIpSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            ClientIpSource::CfConnectingIp => "CfConnectingIp",
+            ClientIpSource::CloudFrontViewerAddress => "CloudFrontViewerAddress",
+            ClientIpSource::ConnectInfo => "ConnectInfo",
+            ClientIpSource::FlyClientIp => "FlyClientIp",
+            #[cfg(feature = "forwarded-header")]
+            ClientIpSource::RightmostForwarded => "RightmostForwarded",
+            ClientIpSource::RightmostXForwardedFor => "RightmostXForwardedFor",
+            ClientIpSource::TrueClientIp => "TrueClientIp",
+            ClientIpSource::XRealIp => "XRealIp",
         })
     }
 }
@@ -266,7 +283,9 @@ mod tests {
 
     #[cfg(feature = "forwarded-header")]
     use super::RightmostForwarded;
-    use super::{CfConnectingIp, FlyClientIp, RightmostXForwardedFor, TrueClientIp, XRealIp};
+    use super::{
+        CfConnectingIp, ClientIpSource, FlyClientIp, RightmostXForwardedFor, TrueClientIp, XRealIp,
+    };
     use crate::CloudFrontViewerAddress;
 
     const VALID_IPV4: &str = "1.2.3.4";
@@ -491,5 +510,28 @@ mod tests {
             .unwrap();
         let resp = app().oneshot(req).await.unwrap();
         assert_eq!(body_to_string(resp.into_body()).await, VALID_IPV6);
+    }
+
+    #[test]
+    fn client_ip_source_display_impl_matches_from_str_impl() {
+        use std::str::FromStr;
+
+        #[inline]
+        fn assert_match(variant: ClientIpSource) {
+            assert_eq!(
+                variant,
+                ClientIpSource::from_str(variant.to_string().as_str()).unwrap()
+            );
+        }
+
+        assert_match(ClientIpSource::CfConnectingIp);
+        assert_match(ClientIpSource::CloudFrontViewerAddress);
+        assert_match(ClientIpSource::ConnectInfo);
+        assert_match(ClientIpSource::FlyClientIp);
+        #[cfg(feature = "forwarded-header")]
+        assert_match(ClientIpSource::RightmostForwarded);
+        assert_match(ClientIpSource::RightmostXForwardedFor);
+        assert_match(ClientIpSource::TrueClientIp);
+        assert_match(ClientIpSource::XRealIp);
     }
 }
