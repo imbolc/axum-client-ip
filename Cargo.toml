@@ -11,14 +11,16 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["serde"]
+default = ["serde", "connect-info"]
+# Enables `ConnectInfo` extractor
+connect-info = ["axum/tokio"]
 # Enables `RightmostForwarded` extractor
 forwarded-header = ["client-ip/forwarded-header"]
 # Enables `ClientIpSource` serde compatibility
 serde = ["dep:serde"]
 
 [dependencies]
-axum = { version = "0.8", default-features = false, features = ["tokio"] }
+axum = { version = "0.8", default-features = false }
 client-ip = "0.1"
 serde = { version = "1", features = ["derive"], optional = true }
 
