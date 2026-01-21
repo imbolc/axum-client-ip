@@ -1,15 +1,13 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![doc = include_str!("../README.md")]
-use std::{
-    error::Error,
-    fmt,
-    marker::Sync,
-    net::{IpAddr, SocketAddr},
-    str::FromStr,
-};
+#[cfg(feature = "connect-info")]
+use std::net::SocketAddr;
+use std::{error::Error, fmt, marker::Sync, net::IpAddr, str::FromStr};
 
+#[cfg(feature = "connect-info")]
+use axum::extract::ConnectInfo;
 use axum::{
-    extract::{ConnectInfo, Extension, FromRequestParts},
+    extract::{Extension, FromRequestParts},
     http::{StatusCode, request::Parts},
     response::{IntoResponse, Response},
 };
@@ -116,6 +114,7 @@ pub enum ClientIpSource {
     CfConnectingIp,
     /// IP from the `CloudFront-Viewer-Address` header
     CloudFrontViewerAddress,
+    #[cfg(feature = "connect-info")]
     /// IP from the [`axum::extract::ConnectInfo`]
     ConnectInfo,
     /// IP from the `Fly-Client-IP` header
@@ -158,6 +157,7 @@ impl FromStr for ClientIpSource {
         Ok(match s {
             "CfConnectingIp" => Self::CfConnectingIp,
             "CloudFrontViewerAddress" => Self::CloudFrontViewerAddress,
+            #[cfg(feature = "connect-info")]
             "ConnectInfo" => Self::ConnectInfo,
             "FlyClientIp" => Self::FlyClientIp,
             #[cfg(feature = "forwarded-header")]
@@ -176,6 +176,7 @@ impl fmt::Display for ClientIpSource {
         f.write_str(match self {
             ClientIpSource::CfConnectingIp => "CfConnectingIp",
             ClientIpSource::CloudFrontViewerAddress => "CloudFrontViewerAddress",
+            #[cfg(feature = "connect-info")]
             ClientIpSource::ConnectInfo => "ConnectInfo",
             ClientIpSource::FlyClientIp => "FlyClientIp",
             #[cfg(feature = "forwarded-header")]
@@ -203,6 +204,7 @@ where
             ClientIpSource::CloudFrontViewerAddress => {
                 CloudFrontViewerAddress::ip_from_headers(&parts.headers)
             }
+            #[cfg(feature = "connect-info")]
             ClientIpSource::ConnectInfo => parts
                 .extensions
                 .get::<ConnectInfo<SocketAddr>>()
@@ -227,6 +229,7 @@ where
 #[non_exhaustive]
 #[derive(Debug, PartialEq)]
 pub enum Rejection {
+    #[cfg(feature = "connect-info")]
     /// No [`axum::extract::ConnectInfo`] in extensions
     NoConnectInfo,
     /// No [`ClientIpSource`] in extensions
@@ -244,6 +247,7 @@ impl From<client_ip::Error> for Rejection {
 impl fmt::Display for Rejection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            #[cfg(feature = "connect-info")]
             Rejection::NoConnectInfo => {
                 write!(f, "Add `axum::extract::ConnectInfo` to request extensions")
             }
@@ -261,7 +265,9 @@ impl std::error::Error for Rejection {}
 impl IntoResponse for Rejection {
     fn into_response(self) -> Response {
         let title = match self {
-            Self::NoConnectInfo | Self::NoClientIpSource => "500 Axum Misconfiguration",
+            #[cfg(feature = "connect-info")]
+            Self::NoConnectInfo => "500 Axum Misconfiguration",
+            Self::NoClientIpSource => "500 Axum Misconfiguration",
             Self::ClientIp { .. } => "500 Proxy Server Misconfiguration",
         };
         let footer = "(the request is rejected by axum-client-ip)";
@@ -526,6 +532,7 @@ mod tests {
 
         assert_match(ClientIpSource::CfConnectingIp);
         assert_match(ClientIpSource::CloudFrontViewerAddress);
+        #[cfg(feature = "connect-info")]
         assert_match(ClientIpSource::ConnectInfo);
         assert_match(ClientIpSource::FlyClientIp);
         #[cfg(feature = "forwarded-header")]
