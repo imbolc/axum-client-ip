@@ -88,6 +88,12 @@ define_extractor!(
 );
 
 define_extractor!(
+    /// Extracts an IP from `X-Envoy-External-Address` (Envoy, Istio) header
+    XEnvoyExternalAddress,
+    client_ip::x_envoy_external_address
+);
+
+define_extractor!(
     /// Extracts an IP from `X-Real-Ip` (Nginx) header
     XRealIp,
     client_ip::x_real_ip
@@ -126,6 +132,8 @@ pub enum ClientIpSource {
     RightmostXForwardedFor,
     /// IP from the `True-Client-IP` header
     TrueClientIp,
+    /// IP from the `X-Envoy-External-Address` address
+    XEnvoyExternalAddress,
     /// IP from the `X-Real-Ip` header
     XRealIp,
 }
@@ -164,6 +172,7 @@ impl FromStr for ClientIpSource {
             "RightmostForwarded" => Self::RightmostForwarded,
             "RightmostXForwardedFor" => Self::RightmostXForwardedFor,
             "TrueClientIp" => Self::TrueClientIp,
+            "XEnvoyExternalAddress" => Self::XEnvoyExternalAddress,
             "XRealIp" => Self::XRealIp,
             _ => return Err(ParseClientIpSourceError(s.to_string())),
         })
@@ -183,6 +192,7 @@ impl fmt::Display for ClientIpSource {
             ClientIpSource::RightmostForwarded => "RightmostForwarded",
             ClientIpSource::RightmostXForwardedFor => "RightmostXForwardedFor",
             ClientIpSource::TrueClientIp => "TrueClientIp",
+            ClientIpSource::XEnvoyExternalAddress => "XEnvoyExternalAddress",
             ClientIpSource::XRealIp => "XRealIp",
         })
     }
@@ -219,6 +229,9 @@ where
                 RightmostXForwardedFor::ip_from_headers(&parts.headers)
             }
             ClientIpSource::TrueClientIp => TrueClientIp::ip_from_headers(&parts.headers),
+            ClientIpSource::XEnvoyExternalAddress => {
+                XEnvoyExternalAddress::ip_from_headers(&parts.headers)
+            }
             ClientIpSource::XRealIp => XRealIp::ip_from_headers(&parts.headers),
         }
         .map(Self)
@@ -289,9 +302,7 @@ mod tests {
 
     #[cfg(feature = "forwarded-header")]
     use super::RightmostForwarded;
-    use super::{
-        CfConnectingIp, ClientIpSource, FlyClientIp, RightmostXForwardedFor, TrueClientIp, XRealIp,
-    };
+    use super::{CfConnectingIp, ClientIpSource, FlyClientIp, RightmostXForwardedFor, TrueClientIp, XEnvoyExternalAddress, XRealIp};
     use crate::CloudFrontViewerAddress;
 
     const VALID_IPV4: &str = "1.2.3.4";
@@ -490,6 +501,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn x_envoy_external_address() {
+        let header = "x-envoy-external-address";
+
+        fn app() -> Router {
+            Router::new().route("/", get(|ip: XEnvoyExternalAddress| async move { ip.0.to_string() }))
+        }
+
+        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let req = Request::builder()
+            .uri("/")
+            .header(header, VALID_IPV4)
+            .body(Body::empty())
+            .unwrap();
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_to_string(resp.into_body()).await, VALID_IPV4);
+
+        let req = Request::builder()
+            .uri("/")
+            .header(header, VALID_IPV6)
+            .body(Body::empty())
+            .unwrap();
+        let resp = app().oneshot(req).await.unwrap();
+        assert_eq!(body_to_string(resp.into_body()).await, VALID_IPV6);
+    }
+
+    #[tokio::test]
     async fn x_real_ip() {
         let header = "x-real-ip";
 
@@ -539,6 +579,7 @@ mod tests {
         assert_match(ClientIpSource::RightmostForwarded);
         assert_match(ClientIpSource::RightmostXForwardedFor);
         assert_match(ClientIpSource::TrueClientIp);
+        assert_match(ClientIpSource::XEnvoyExternalAddress);
         assert_match(ClientIpSource::XRealIp);
     }
 }

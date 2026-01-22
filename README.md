@@ -24,13 +24,14 @@ application independent from a proxy it can run behind (if any) and also
 separate extractors for each proxy / source header.
 
 | Extractor / `ClientIpSource` Variant | Header Used                 | Typical Proxy / Service                                 |
-| ------------------------------------ | --------------------------- | ------------------------------------------------------- |
+|--------------------------------------| --------------------------- |---------------------------------------------------------|
 | [`CfConnectingIp`]                   | `CF-Connecting-IP`          | Cloudflare                                              |
 | [`CloudFrontViewerAddress`]          | `CloudFront-Viewer-Address` | AWS CloudFront                                          |
 | [`FlyClientIp`]                      | `Fly-Client-IP`             | Fly.io                                                  |
 | [`RightmostForwarded`]               | `Forwarded`                 | Proxies supporting RFC 7239 (extracts rightmost `for=`) |
 | [`RightmostXForwardedFor`]           | `X-Forwarded-For`           | Nginx, Apache, HAProxy, CDNs, LBs                       |
 | [`TrueClientIp`]                     | `True-Client-IP`            | Cloudflare, Akamai                                      |
+| [`XEnvoyExternalAddress`]            | `X-Envoy-External-Address`  | Envoy, Istio                                            |
 | [`XRealIp`]                          | `X-Real-Ip`                 | Nginx                                                   |
 | [`ConnectInfo`]                      | N/A (uses socket address)   | No proxy, e.g. listening directly to 80 port            |
 
