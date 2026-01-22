@@ -302,7 +302,10 @@ mod tests {
 
     #[cfg(feature = "forwarded-header")]
     use super::RightmostForwarded;
-    use super::{CfConnectingIp, ClientIpSource, FlyClientIp, RightmostXForwardedFor, TrueClientIp, XEnvoyExternalAddress, XRealIp};
+    use super::{
+        CfConnectingIp, ClientIpSource, FlyClientIp, RightmostXForwardedFor, TrueClientIp,
+        XEnvoyExternalAddress, XRealIp,
+    };
     use crate::CloudFrontViewerAddress;
 
     const VALID_IPV4: &str = "1.2.3.4";
@@ -505,7 +508,10 @@ mod tests {
         let header = "x-envoy-external-address";
 
         fn app() -> Router {
-            Router::new().route("/", get(|ip: XEnvoyExternalAddress| async move { ip.0.to_string() }))
+            Router::new().route(
+                "/",
+                get(|ip: XEnvoyExternalAddress| async move { ip.0.to_string() }),
+            )
         }
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
