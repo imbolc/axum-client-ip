@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("../README.md")]
 #[cfg(feature = "connect-info")]
 use std::net::SocketAddr;
@@ -70,6 +71,9 @@ define_extractor!(
 #[cfg(feature = "forwarded-header")]
 define_extractor!(
     /// Extracts the rightmost IP from `Forwarded` header
+    ///
+    /// Requires the `forwarded-header` feature.
+    #[cfg_attr(docsrs, doc(cfg(feature = "forwarded-header")))]
     RightmostForwarded,
     client_ip::rightmost_forwarded
 );
@@ -125,7 +129,10 @@ pub enum ClientIpSource {
     /// IP from the `Fly-Client-IP` header
     FlyClientIp,
     #[cfg(feature = "forwarded-header")]
-    /// Rightmost IP from the `Forwarded` header
+    /// Rightmost IP from the `Forwarded` header.
+    ///
+    /// Requires the `forwarded-header` feature.
+    #[cfg_attr(docsrs, doc(cfg(feature = "forwarded-header")))]
     RightmostForwarded,
     /// Rightmost IP from the `X-Forwarded-For` header
     RightmostXForwardedFor,

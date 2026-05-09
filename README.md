@@ -35,6 +35,8 @@ separate extractors for each proxy / source header.
 | [`XRealIp`]                          | `X-Real-Ip`                 | Nginx                                                   |
 | [`ConnectInfo`]                      | N/A (uses socket address)   | No proxy, e.g. listening directly to 80 port            |
 
+[`RightmostForwarded`] requires enabling the `forwarded-header` feature.
+
 ## Configurable extractor
 
 The configurable extractor assumes initializing [`ClientIpSource`] at runtime
