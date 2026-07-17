@@ -114,7 +114,10 @@ define_extractor!(
 #[derive(Debug, Clone, Copy)]
 pub struct ClientIp(pub IpAddr);
 
-/// [`ClientIp`] source configuration
+/// [`ClientIp`] source configuration.
+///
+/// String parsing and serde use the exact PascalCase variant name, for example
+/// `ConnectInfo` or `RightmostXForwardedFor`.
 #[non_exhaustive]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -158,7 +161,11 @@ pub struct ParseClientIpSourceError(String);
 
 impl fmt::Display for ParseClientIpSourceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Invalid ClientIpSource value {}", self.0)
+        write!(
+            f,
+            "Invalid ClientIpSource value {}. Expected an exact PascalCase ClientIpSource variant name",
+            self.0
+        )
     }
 }
 
