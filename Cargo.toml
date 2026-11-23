@@ -12,7 +12,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["serde", "connect-info"]
-# Enables `ConnectInfo` extractor
+# Enables `ConnectInfo` extractor and trusted proxies support
 connect-info = ["axum/tokio"]
 # Enables `RightmostForwarded` extractor
 forwarded-header = ["client-ip/forwarded-header"]

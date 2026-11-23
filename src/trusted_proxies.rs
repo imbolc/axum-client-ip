@@ -95,10 +95,13 @@ impl FromStr for Cidr {
         };
         let addr = addr.parse::<IpAddr>().map_err(|_| err())?;
         let prefix = prefix
-            .map(|p| match p.bytes().all(|b| b.is_ascii_digit()) {
+            .map(|p| {
                 // `u8::from_str` alone would also accept a leading `+`
-                true => p.parse::<u8>().map_err(|_| err()),
-                false => Err(err()),
+                if p.bytes().all(|b| b.is_ascii_digit()) {
+                    p.parse::<u8>().map_err(|_| err())
+                } else {
+                    Err(err())
+                }
             })
             .transpose()?;
         // `::ffff:a.b.c.d/96` and longer is an IPv4 network
@@ -199,20 +202,21 @@ impl FromStr for TrustedProxies {
 /// [The perils of the "real" client IP][perils] and what nginx's
 /// `real_ip_recursive` does.
 ///
-/// - If the peer isn't trusted it is returned and the headers are ignored, so
-///   a client connecting directly can't spoof its address.
+/// - If the peer isn't trusted it is returned and the headers are ignored, so a
+///   client connecting directly can't spoof its address.
 /// - An entry that isn't a bare IP address (for example one with a port) is
 ///   rejected when reached, never skipped. Entries to the left of the client
 ///   aren't looked at.
 /// - If every entry is trusted the request is rejected.
 /// - At most [`MAX_FORWARDED_ENTRIES`] entries are examined, a longer run of
 ///   trusted entries is rejected.
-/// - IPv4-mapped IPv6 addresses are normalized to IPv4 before matching and
-///   in the result.
+/// - IPv4-mapped IPv6 addresses are normalized to IPv4 before matching and in
+///   the result.
 ///
 /// Requires a [`TrustedProxies`] extension and
 /// `into_make_service_with_connect_info::<SocketAddr>()`, otherwise the
-/// request is rejected as a misconfiguration.
+/// request is rejected as a misconfiguration. Also requires the
+/// `connect-info` feature.
 ///
 /// ```
 /// use axum::{Router, routing::get};
@@ -231,6 +235,7 @@ impl FromStr for TrustedProxies {
 /// ```
 ///
 /// [perils]: https://adam-p.ca/blog/2022/03/x-forwarded-for/
+#[cfg_attr(docsrs, doc(cfg(feature = "connect-info")))]
 #[derive(Debug, Clone, Copy)]
 pub struct RightmostUntrustedXForwardedFor(pub IpAddr);
 
@@ -333,7 +338,8 @@ mod tests {
     #[test]
     fn spoofed_leftmost_entries_are_ignored() {
         let t = trusted("127.0.0.1, 10.0.0.0/8");
-        // The client sent `X-Forwarded-For: 6.6.6.6`, Apache appended the real address
+        // The client sent `X-Forwarded-For: 6.6.6.6`, Apache appended the real
+        // address
         assert_eq!(
             resolve(&t, "127.0.0.1", &["6.6.6.6, 9.9.9.9"]),
             Ok(ip("9.9.9.9"))
@@ -626,6 +632,9 @@ mod tests {
         assert_eq!(cidr("::ffff:10.0.0.0/104"), cidr("10.0.0.0/8"));
         assert_eq!(cidr("::ffff:10.0.0.1"), cidr("10.0.0.1/32"));
         assert_eq!(cidr("::ffff:0:0/96"), cidr("0.0.0.0/0"));
+        // A shorter prefix is a plain IPv6 network that never matches IPv4
+        assert!(!cidr("::ffff:10.0.0.0/95").contains(ip("10.0.0.1")));
+        assert!(cidr("::ffff:10.0.0.0/95").contains(ip("::fffe:0:1")));
         // Invalid prefixes and addresses
         for bad in [
             "",

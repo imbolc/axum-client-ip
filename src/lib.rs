@@ -151,7 +151,9 @@ pub enum ClientIpSource {
     /// Rightmost IP from the `X-Forwarded-For` header that isn't a
     /// [`TrustedProxies`] member, see [`RightmostUntrustedXForwardedFor`]
     ///
-    /// Requires a [`TrustedProxies`] extension.
+    /// Requires a [`TrustedProxies`] extension and the `connect-info`
+    /// feature.
+    #[cfg_attr(docsrs, doc(cfg(feature = "connect-info")))]
     RightmostUntrustedXForwardedFor,
     /// IP from the `True-Client-IP` header
     TrueClientIp,
