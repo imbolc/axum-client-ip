@@ -29,6 +29,7 @@ separate extractors for each proxy / source header.
 | [`CloudFrontViewerAddress`]          | `CloudFront-Viewer-Address` | AWS CloudFront                                          |
 | [`FlyClientIp`]                      | `Fly-Client-IP`             | Fly.io                                                  |
 | [`RightmostForwarded`]               | `Forwarded`                 | Proxies supporting RFC 7239 (extracts rightmost `for=`) |
+| [`RightmostUntrustedXForwardedFor`]  | `X-Forwarded-For`           | Several proxies in a row, e.g. Cloudflare and Apache    |
 | [`RightmostXForwardedFor`]           | `X-Forwarded-For`           | Nginx, Apache, HAProxy, CDNs, LBs                       |
 | [`TrueClientIp`]                     | `True-Client-IP`            | Cloudflare, Akamai                                      |
 | [`XEnvoyExternalAddress`]            | `X-Envoy-External-Address`  | Envoy, Istio                                            |
@@ -36,6 +37,34 @@ separate extractors for each proxy / source header.
 | [`ConnectInfo`]                      | N/A (uses socket address)   | No proxy, e.g. listening directly to 80 port            |
 
 [`RightmostForwarded`] requires enabling the `forwarded-header` feature.
+[`RightmostUntrustedXForwardedFor`] requires the `connect-info` feature.
+
+## Several proxies in a row
+
+[`RightmostXForwardedFor`] returns the address of the nearest proxy, which is
+not the client when there is more than one proxy (e.g. Cloudflare in front of
+Apache). To handle it, list the proxies you trust in [`TrustedProxies`] and use
+[`RightmostUntrustedXForwardedFor`] (or the `ClientIpSource` variant of the
+same name). The extractor walks the chain of `X-Forwarded-For` entries and the
+TCP peer address from the right and returns the first address outside of the
+trusted networks, so the entries a client can spoof are never used. A request
+from an untrusted peer gets the peer address, whatever the headers say. See
+the [`RightmostUntrustedXForwardedFor`] docs for the details and an example.
+
+```rust,no_run
+use axum::{Router, routing::get};
+use axum_client_ip::{RightmostUntrustedXForwardedFor as ClientIp, TrustedProxies};
+
+async fn handler(ClientIp(ip): ClientIp) -> String {
+    ip.to_string()
+}
+
+let trusted: TrustedProxies = "127.0.0.0/8, ::1, 173.245.48.0/20".parse().unwrap();
+let app: Router = Router::new()
+    .route("/", get(handler))
+    .layer(trusted.into_extension());
+// serve it with `into_make_service_with_connect_info::<SocketAddr>()`
+```
 
 ## Configurable extractor
 
