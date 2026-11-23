@@ -12,6 +12,14 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
+#[cfg(feature = "connect-info")]
+mod trusted_proxies;
+
+#[cfg(feature = "connect-info")]
+pub use trusted_proxies::{
+    Cidr, MAX_FORWARDED_ENTRIES, ParseCidrError, RightmostUntrustedXForwardedFor, TrustedProxies,
+};
+
 /// Defines an extractor
 macro_rules! define_extractor {
     (
@@ -139,6 +147,12 @@ pub enum ClientIpSource {
     RightmostForwarded,
     /// Rightmost IP from the `X-Forwarded-For` header
     RightmostXForwardedFor,
+    #[cfg(feature = "connect-info")]
+    /// Rightmost IP from the `X-Forwarded-For` header that isn't a
+    /// [`TrustedProxies`] member, see [`RightmostUntrustedXForwardedFor`]
+    ///
+    /// Requires a [`TrustedProxies`] extension.
+    RightmostUntrustedXForwardedFor,
     /// IP from the `True-Client-IP` header
     TrueClientIp,
     /// IP from the `X-Envoy-External-Address` address
@@ -183,6 +197,8 @@ impl FromStr for ClientIpSource {
             "FlyClientIp" => Self::FlyClientIp,
             #[cfg(feature = "forwarded-header")]
             "RightmostForwarded" => Self::RightmostForwarded,
+            #[cfg(feature = "connect-info")]
+            "RightmostUntrustedXForwardedFor" => Self::RightmostUntrustedXForwardedFor,
             "RightmostXForwardedFor" => Self::RightmostXForwardedFor,
             "TrueClientIp" => Self::TrueClientIp,
             "XEnvoyExternalAddress" => Self::XEnvoyExternalAddress,
@@ -203,6 +219,8 @@ impl fmt::Display for ClientIpSource {
             ClientIpSource::FlyClientIp => "FlyClientIp",
             #[cfg(feature = "forwarded-header")]
             ClientIpSource::RightmostForwarded => "RightmostForwarded",
+            #[cfg(feature = "connect-info")]
+            ClientIpSource::RightmostUntrustedXForwardedFor => "RightmostUntrustedXForwardedFor",
             ClientIpSource::RightmostXForwardedFor => "RightmostXForwardedFor",
             ClientIpSource::TrueClientIp => "TrueClientIp",
             ClientIpSource::XEnvoyExternalAddress => "XEnvoyExternalAddress",
@@ -238,6 +256,10 @@ where
             ClientIpSource::RightmostForwarded => {
                 RightmostForwarded::ip_from_headers(&parts.headers)
             }
+            #[cfg(feature = "connect-info")]
+            ClientIpSource::RightmostUntrustedXForwardedFor => {
+                trusted_proxies::ip_from_parts(parts)
+            }
             ClientIpSource::RightmostXForwardedFor => {
                 RightmostXForwardedFor::ip_from_headers(&parts.headers)
             }
@@ -260,6 +282,15 @@ pub enum Rejection {
     NoConnectInfo,
     /// No [`ClientIpSource`] in extensions
     NoClientIpSource,
+    #[cfg(feature = "connect-info")]
+    /// No [`TrustedProxies`] in extensions
+    NoTrustedProxies,
+    #[cfg(feature = "connect-info")]
+    /// Every hop of the proxy chain is a trusted proxy, so there's no client
+    NoUntrustedClientIp,
+    #[cfg(feature = "connect-info")]
+    /// More than [`MAX_FORWARDED_ENTRIES`] trusted hops in `X-Forwarded-For`
+    TooManyForwardedEntries,
     /// [`client_ip::Error`]
     ClientIp(client_ip::Error),
 }
@@ -281,6 +312,21 @@ impl fmt::Display for Rejection {
                 f,
                 "Add `axum_client_ip::ClientIpSource` to request extensions"
             ),
+            #[cfg(feature = "connect-info")]
+            Rejection::NoTrustedProxies => write!(
+                f,
+                "Add `axum_client_ip::TrustedProxies` to request extensions"
+            ),
+            #[cfg(feature = "connect-info")]
+            Rejection::NoUntrustedClientIp => write!(
+                f,
+                "Every address in the proxy chain is a trusted proxy, there's no client IP"
+            ),
+            #[cfg(feature = "connect-info")]
+            Rejection::TooManyForwardedEntries => write!(
+                f,
+                "More than {MAX_FORWARDED_ENTRIES} trusted `X-Forwarded-For` entries"
+            ),
             Rejection::ClientIp(e) => write!(f, "{e}"),
         }
     }
@@ -294,6 +340,12 @@ impl IntoResponse for Rejection {
             #[cfg(feature = "connect-info")]
             Self::NoConnectInfo => "500 Axum Misconfiguration",
             Self::NoClientIpSource => "500 Axum Misconfiguration",
+            #[cfg(feature = "connect-info")]
+            Self::NoTrustedProxies => "500 Axum Misconfiguration",
+            #[cfg(feature = "connect-info")]
+            Self::NoUntrustedClientIp | Self::TooManyForwardedEntries => {
+                "500 Proxy Server Misconfiguration"
+            }
             Self::ClientIp { .. } => "500 Proxy Server Misconfiguration",
         };
         let footer = "(the request is rejected by axum-client-ip)";
@@ -596,6 +648,8 @@ mod tests {
         assert_match(ClientIpSource::FlyClientIp);
         #[cfg(feature = "forwarded-header")]
         assert_match(ClientIpSource::RightmostForwarded);
+        #[cfg(feature = "connect-info")]
+        assert_match(ClientIpSource::RightmostUntrustedXForwardedFor);
         assert_match(ClientIpSource::RightmostXForwardedFor);
         assert_match(ClientIpSource::TrueClientIp);
         assert_match(ClientIpSource::XEnvoyExternalAddress);
